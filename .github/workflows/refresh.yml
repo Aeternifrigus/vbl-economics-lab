@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -16,13 +20,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]"
-      - run: python -m pytest -q
+          cache: "pip"
+      - run: pip install -e .
       - name: Pull oil, FX and weather snapshots
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python -m pwl ingest
-      - name: Rebuild features and refresh the nowcast inputs
+      - name: Rebuild the quarterly feature table
         run: python -m pwl features
       - name: Commit snapshots
         run: |

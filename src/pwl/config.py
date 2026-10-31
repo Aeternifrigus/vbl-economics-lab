@@ -1,28 +1,33 @@
+"""Configuration constants - thin wrapper around settings for backward compatibility."""
+
 from pathlib import Path
 
+from .settings import settings
+
 ROOT = Path(__file__).resolve().parents[2]
-DATA_RAW = ROOT / "data" / "raw"
-DATA_EXT = ROOT / "data" / "external"
-MODELS = ROOT / "models"
-REPORTS = ROOT / "reports"
+DATA_RAW = settings.data_raw_dir
+DATA_EXT = settings.data_external_dir
+MODELS = settings.models_dir
+REPORTS = settings.reports_dir
 
 # A lagged or weather model is refused below this many quarters unless forced.
-MIN_QUARTERS_FOR_RELEASE = 20
+MIN_QUARTERS_FOR_RELEASE = settings.min_quarters_for_release
 
 # Taken from the original report, treated as a tunable rather than a fact.
-HEAT_THRESHOLD_C = 38.0
+HEAT_THRESHOLD_C = settings.heat_threshold_c
 
 # ASSUMPTION: rough metro populations in millions, used only as weights for a
 # population-weighted weather index. Replace with a better demand weighting.
-CITIES = {
-    "Delhi": (28.61, 77.21, 32.0),
-    "Mumbai": (19.08, 72.88, 21.0),
-    "Kolkata": (22.57, 88.36, 15.0),
-    "Chennai": (13.08, 80.27, 11.0),
-    "Bengaluru": (12.97, 77.59, 13.0),
-    "Hyderabad": (17.39, 78.49, 11.0),
-    "Lucknow": (26.85, 80.95, 4.0),
-    "Patna": (25.59, 85.14, 2.5),
-    "Jaipur": (26.91, 75.79, 4.0),
-    "Ahmedabad": (23.02, 72.57, 8.5),
-}
+CITIES = settings.cities
+
+
+# Feature columns for the lagged model (defined here for backward compat)
+LAG_FEATURES = [
+    "brent_inr_lag0",
+    "brent_inr_lag1",
+    "brent_inr_lag2",
+    "brent_inr_lag3",
+    "tmax_anom",
+    "heat_days",
+    "rain_anom",
+]

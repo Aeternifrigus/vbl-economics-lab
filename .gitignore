@@ -1,5 +1,29 @@
+# Python
 __pycache__/
-*.pyc
-.pytest_cache/
+*.py[cod]
 *.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
 .env
+.env.local
+
+# OS and editor
+.DS_Store
+__MACOSX/
+.vscode/
+.idea/
+
+# Build
+dist/
+build/
+
+# Model binaries are published as release assets. Metadata (*.json) and reports stay in git.
+models/*.joblib
+
+# Docker
+.docker/

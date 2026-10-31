@@ -1,3 +1,5 @@
+"""Entry point for `python -m pwl`."""
+
 from .cli import main
 
-raise SystemExit(main())
+main()

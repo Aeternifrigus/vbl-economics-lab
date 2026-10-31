@@ -1,0 +1,16 @@
+claim_id,claim,report_value,evidence,verdict,source_url
+C1,Q2 YoY volume surge,+42.3%,VBL consolidated Q2 growth: +4.6 (2023) +28.1 (2024) -3.0 (2025) +19.8 (2026); 2024 and 2026 include acquisitions,not reproduced,data/raw/vbl_q2_history.csv
+C2,Heat anomaly vs volume correlation,r = 0.89,no dataset or station set given; only 3-4 usable weather years,unverifiable,
+C3,Weather sign (heat up, rain down),positive heat effect,management attributes 2023 and 2025 shortfalls to rain and 2024 strength to heat,direction supported (n small),data/raw/vbl_q2_history.csv
+C4,Q2 EBITDA margin,21.8%,VBL 27.1% to 27.9% in Q2 2025 and Q2 2026 on the filings table,level not reproduced,data/raw/vbl_quarterly.csv
+C5,Q1 and Q3 EBITDA margin,14.2% and 13.5%,VBL 22.25% (2025Q1) 22.75% (2026Q1) 22.73% (2025Q3),level not reproduced,data/raw/vbl_quarterly.csv
+C6,Q4 EBITDA margin,16.0%,VBL 14.75% in 2025Q4,same order of magnitude,data/raw/vbl_quarterly.csv
+C7,Margin swing comes from input cost,implied by crude thesis,opex ratio spans about 14 points while gross margin spans about 2.6 points across six quarters,mostly operating leverage,reports/operating_leverage.md
+C8,Brent above 90 pushes gross margin to about 38%,38%,lowest observed Q2 gross margin 50.5% (2022Q2),magnitude not reproduced,data/raw/vbl_q2_history.csv
+C9,Brent below 70 gives gross margin above 52%,>52%,VBL 55% range in 2025 (Brent about 68),holds but too weak a test,data/raw/vbl_quarterly.csv
+C10,Inverse crude to gross margin relationship,monotonic inverse,Brent 80.56 in 2024 vs about 68 in 2025 with gross margin 55.5 vs 55.2; 2026Q2 gross margin rose with Brent projected near 115,not monotonic; lag and procurement matter,https://www.rigzone.com/news/eia_ups_brent_price_forecast_still_sees_drop_in_2026-12-dec-2025-182522-article/
+C11,Resin pass-through per 10 USD crude,INR 0.25 per preform,no resin price series checked; rough estimate by the author is about INR 0.10,unverified,
+C12,Bisleri share,37%,dated sources range from 32% to 40%,plausible but unsourced,https://blog.investyadnya.in/2022/12/08/tata-consumer-products-limited-to-acquire-bisleri-unlocking-deal-synergies-of-tcpl-bisleri-deal/
+C13,Fragmented share,over 40%,IKON estimate: market only about 25% organised,understated,https://www.storyboard18.com/amp/brand-makers/world-water-day-how-brands-are-quenching-indias-thirst-for-packaged-water-59915.htm
+C14,Leader EBITDA 20 to 23%,20-23%,VBL FY2025 consolidated 23.3% but water is a minority of volume; one source puts water margins near 10%,not water-specific,https://financialreports.eu/filings/varun-beverages-limited/call-transcript/2026/42242398/
+C15,Unit cost INR 3.04 to 4.00 and freight table and 100 km wall,as stated,no public data found,unverified,

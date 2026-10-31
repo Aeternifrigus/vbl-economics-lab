@@ -1,10 +1,13 @@
-import pandas as pd
-
 from pwl.ingest import fred, openmeteo
 
 
 def test_fred_parser_skips_missing_values():
-    payload = {"observations": [{"date": "2024-01-02", "value": "80.5"}, {"date": "2024-01-03", "value": "."}]}
+    payload = {
+        "observations": [
+            {"date": "2024-01-02", "value": "80.5"},
+            {"date": "2024-01-03", "value": "."},
+        ]
+    }
     df = fred.parse_observations(payload)
     assert len(df) == 1 and df["value"].iloc[0] == 80.5
 

@@ -7,7 +7,9 @@ from pwl.features import add_lags, quarterly_oil_fx, quarterly_weather
 def _daily(years=5):
     dates = pd.date_range("2019-01-01", periods=365 * years + 2, freq="D")
     rng = np.random.default_rng(1)
-    tmax = 30 + 8 * np.sin((dates.dayofyear - 80) / 365 * 2 * np.pi) + rng.normal(0, 1, len(dates))
+    tmax = (
+        30 + 8 * np.sin((dates.day_of_year - 80) / 365 * 2 * np.pi) + rng.normal(0, 1, len(dates))
+    )
     return pd.DataFrame(
         {
             "date": dates,

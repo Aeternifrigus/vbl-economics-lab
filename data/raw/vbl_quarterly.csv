@@ -1,7 +1,10 @@
-quarter,revenue_cr,gross_profit_cr,opex_cr,ebitda_cr,volume_growth_yoy_pct,volume_note,source_url
-2025Q1,5680,3151,1887,1264,,,https://www.stockezee.com/stocks/vbl/results
-2025Q2,7163,3972,1973,1999,-3.0,consolidated; domestic decline attributed to rain,https://www.stockezee.com/stocks/vbl/results
-2025Q3,5048,2929,1781,1147,2.4,consolidated; India flat on weather,https://www.stockezee.com/stocks/vbl/results
-2025Q4,4335,2459,1819,639,,,https://www.stockezee.com/stocks/vbl/results
-2026Q1,6722,3776,2247,1529,16.3,consolidated,https://www.stockezee.com/stocks/vbl/results
-2026Q2,8651,4844,2501,2343,19.8,consolidated; includes Twizza (11.8M cases); India organic +14.4,https://www.stockezee.com/stocks/vbl/results
+quarter,revenue_cr,gross_profit_cr,opex_cr,ebitda_cr,volume_growth_yoy_pct,volume_note,source
+2022Q1,2867.5,1457.3,926.3,531.0,,,file:1-2.-Results.pdf#p1
+2022Q4,2257.2,1246.4,938.9,307.5,,,file:1-2.-Results.pdf#p1
+2023Q1,3952.6,2041.3,1243.2,798.0,,,file:1-2.-Results.pdf#p1
+2025Q1,5680.0,3151.0,1887.0,1264.0,,,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
+2025Q2,7163.0,3972.0,1973.0,1999.0,-3.0,consolidated; domestic decline attributed to rain,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
+2025Q3,5048.0,2929.0,1781.0,1147.0,2.4,consolidated; India flat on weather,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
+2025Q4,4335.0,2459.0,1819.0,639.0,,,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
+2026Q1,6722.0,3776.0,2247.0,1529.0,16.3,consolidated,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
+2026Q2,8651.0,4844.0,2501.0,2343.0,19.8,consolidated; includes Twizza (11.8M cases); India organic +14.4,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)

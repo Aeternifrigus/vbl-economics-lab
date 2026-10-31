@@ -1,181 +1,330 @@
-import argparse
+"""Command-line interface for packaged-water-lab.
+
+Exit codes: 0 success, 1 error or validation failure, 2 missing input file,
+3 not enough data for the requested model.
+"""
+
 import hashlib
 import json
-import os
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import NoReturn
 
 import joblib
 import pandas as pd
+import typer
 
 from .backtest import rolling_backtest
-from .config import DATA_EXT, DATA_RAW, MODELS, REPORTS
+from .config import DATA_EXT, DATA_RAW, LAG_FEATURES, MODELS, REPORTS
+from .exceptions import (
+    ConfigurationError,
+    IngestionError,
+    InsufficientDataError,
+    ModelTrainingError,
+    PWLError,
+)
+from .extract import extract_directory, merge_into_table
 from .features import build_table, quarterly_oil_fx, quarterly_weather
-from .models.lagged import InsufficientDataError, coef_table, fit_lagged_ridge
+from .ingest import fred, openmeteo
+from .logging_config import setup_logging
+from .models.lagged import coef_table, fit_lagged_ridge
 from .models.leverage import fit_leverage, render_report, variance_decomposition
+from .settings import settings
 from .snapshot import save_snapshot
-from .validate import check_vbl, load_vbl
+from .validate import check_vbl, load_vbl, vbl_warnings
+
+app = typer.Typer(
+    name="pwl",
+    help="Packaged Water Lab: testing the packaged-water economics narrative against data",
+    add_completion=False,
+)
 
 VBL_CSV = DATA_RAW / "vbl_quarterly.csv"
 FEATURES_CSV = DATA_EXT / "features_quarterly.csv"
-LAG_FEATURES = [
-    "brent_inr_lag0",
-    "brent_inr_lag1",
-    "brent_inr_lag2",
-    "brent_inr_lag3",
-    "tmax_anom",
-    "heat_days",
-    "rain_anom",
-]
+TARGET = "gm_pct"
+
+EXIT_ERROR = 1
+EXIT_MISSING = 2
+EXIT_INSUFFICIENT = 3
 
 
-def cmd_validate(args):
-    problems = check_vbl(load_vbl(VBL_CSV))
-    if problems:
-        print("Validation failed:")
-        for p in problems:
-            print(" -", p)
-        return 1
-    print("Validation passed.")
-    return 0
+def _fail(message: str, code: int = EXIT_ERROR) -> NoReturn:
+    typer.echo(message, err=True)
+    raise typer.Exit(code)
 
 
-def cmd_leverage(args):
-    df = load_vbl(VBL_CSV)
-    problems = check_vbl(df)
-    if problems:
-        print("Fix data first:", problems)
-        return 1
-    fit = fit_leverage(df)
-    decomp = variance_decomposition(df)
-    MODELS.mkdir(exist_ok=True)
-    REPORTS.mkdir(exist_ok=True)
-    latest = str(df["quarter"].iloc[-1])
-    payload = {
-        "model": "operating_leverage_ols",
-        "latest_quarter": latest,
-        "data_sha256": hashlib.sha256(VBL_CSV.read_bytes()).hexdigest(),
-        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "fit": fit.to_dict(),
-        "variance_decomposition": decomp,
-    }
-    (MODELS / f"leverage_{latest}.json").write_text(json.dumps(payload, indent=2))
-    (REPORTS / "operating_leverage.md").write_text(render_report(df, fit, decomp))
-    print(f"n={fit.n} R2={fit.r2:.3f} fixed={fit.fixed_cr:.0f}cr variable={fit.var_cost_ratio * 100:.1f}%")
-    print(f"opex ratio share of margin variance: {decomp['share_opex_ratio'] * 100:.1f}%")
-    print(f"wrote models/leverage_{latest}.json and reports/operating_leverage.md")
-    return 0
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def cmd_ingest(args):
-    key = os.environ.get("FRED_API_KEY")
-    if not key:
-        print("Set FRED_API_KEY (free key from fred.stlouisfed.org).")
-        return 2
-    from .ingest import fred, openmeteo
-
-    start = args.start
-    end = datetime.now(timezone.utc).date().isoformat()
-    brent = fred.fetch_series(fred.BRENT, key, start)
-    fx = fred.fetch_series(fred.USDINR, key, start)
-    weather = openmeteo.fetch_weighted(start, end)
-    save_snapshot(brent, "brent_daily", "FRED DCOILBRENTEU")
-    save_snapshot(fx, "usdinr_daily", "FRED DEXINUS")
-    save_snapshot(weather, "weather_daily", "Open-Meteo archive, population-weighted")
-    print(f"snapshots written: brent={len(brent)} fx={len(fx)} weather={len(weather)} rows")
-    return 0
-
-
-def _read(name):
+def _read_snapshot(name: str) -> pd.DataFrame:
     path = DATA_EXT / f"{name}.csv"
     if not path.exists():
-        raise FileNotFoundError(f"{path} missing. Run `python -m pwl ingest` first.")
+        raise FileNotFoundError(f"{path} missing. Run `pwl ingest` first.")
     df = pd.read_csv(path)
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"])
     return df
 
 
-def cmd_features(args):
-    vbl = load_vbl(VBL_CSV)
-    oil = quarterly_oil_fx(_read("brent_daily"), _read("usdinr_daily"))
-    weather = quarterly_weather(_read("weather_daily"))
-    table = build_table(vbl, oil, weather)
-    out = table.copy()
-    out.insert(0, "quarter", out.index.astype(str))
-    save_snapshot(out.reset_index(drop=True), "features_quarterly", "built from snapshots and vbl_quarterly.csv")
-    print(f"feature table: {len(table)} quarters, {table[LAG_FEATURES].dropna().shape[0]} with all features")
-    return 0
-
-
-def _load_features():
+def _load_features() -> pd.DataFrame:
     if not FEATURES_CSV.exists():
-        raise FileNotFoundError("features_quarterly.csv missing. Run ingest then features.")
+        raise FileNotFoundError(
+            "features_quarterly.csv missing. Run `pwl ingest` then `pwl features`."
+        )
     df = pd.read_csv(FEATURES_CSV)
     df.index = pd.PeriodIndex(df["quarter"], freq="Q")
     return df
 
 
-def cmd_train(args):
-    try:
-        df = _load_features()
-    except FileNotFoundError as exc:
-        print(exc)
-        return 2
-    try:
-        model = fit_lagged_ridge(df, "gm_pct", LAG_FEATURES, force=args.force)
-    except InsufficientDataError as exc:
-        print("Refusing to train:", exc)
-        return 3
-    MODELS.mkdir(exist_ok=True)
+def _validated_vbl() -> pd.DataFrame:
+    """Load the VBL table, print warnings, and exit with code 1 if it has errors."""
+    df = load_vbl(VBL_CSV)
+    problems = check_vbl(df)
+    if problems:
+        typer.echo("Validation failed:", err=True)
+        for p in problems:
+            typer.echo(f" - {p}", err=True)
+        raise typer.Exit(EXIT_ERROR)
+    for w in vbl_warnings(df):
+        typer.echo(f"warning: {w}", err=True)
+    return df
+
+
+def _fit_leverage_and_report(df: pd.DataFrame) -> None:
+    fit = fit_leverage(df)
+    decomp = variance_decomposition(df)
+    MODELS.mkdir(parents=True, exist_ok=True)
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    latest = str(df["quarter"].iloc[-1])
+    payload = {
+        "model": "operating_leverage_ols",
+        "latest_quarter": latest,
+        "n_quarters": fit.n,
+        "data_sha256": hashlib.sha256(VBL_CSV.read_bytes()).hexdigest(),
+        "trained_at": _now(),
+        "fit": fit.to_dict(),
+        "variance_decomposition": decomp,
+    }
+    model_path = MODELS / f"leverage_{latest}.json"
+    model_path.write_text(json.dumps(payload, indent=2))
+    report_path = REPORTS / "operating_leverage.md"
+    report_path.write_text(render_report(df, fit, decomp))
+    typer.echo(
+        f"n={fit.n} R2={fit.r2:.3f} fixed={fit.fixed_cr:.0f}cr "
+        f"variable={fit.var_cost_ratio * 100:.1f}%"
+    )
+    typer.echo(f"opex ratio share of margin variance: {decomp['share_opex_ratio'] * 100:.1f}%")
+    typer.echo(f"wrote {model_path} and {report_path}")
+
+
+def _build_features() -> pd.DataFrame:
+    vbl = load_vbl(VBL_CSV)
+    oil = quarterly_oil_fx(_read_snapshot("brent_daily"), _read_snapshot("usdinr_daily"))
+    weather = quarterly_weather(_read_snapshot("weather_daily"))
+    table = build_table(vbl, oil, weather)
+    out = table.copy()
+    out.insert(0, "quarter", out.index.astype(str))
+    save_snapshot(
+        out.reset_index(drop=True),
+        "features_quarterly",
+        "built from snapshots and vbl_quarterly.csv",
+    )
+    complete = table[LAG_FEATURES].dropna().shape[0]
+    typer.echo(f"Feature table: {len(table)} quarters, {complete} with all features")
+    return table
+
+
+def _train(df: pd.DataFrame, force: bool) -> None:
+    model = fit_lagged_ridge(df, TARGET, LAG_FEATURES, force=force)
+    MODELS.mkdir(parents=True, exist_ok=True)
     latest = str(df.index[-1])
     joblib.dump(model, MODELS / f"lagged_gm_{latest}.joblib")
     table = coef_table(model, LAG_FEATURES)
+    # Oil lags are highly correlated in real data, so individual lag coefficients are unstable.
+    # The cumulative effect across lags is the number to quote.
+    oil_rows = table[table["feature"].str.startswith("brent_inr_lag")]
     meta = {
         "model": "distributed_lag_ridge",
-        "target": "gm_pct",
+        "target": TARGET,
         "latest_quarter": latest,
         "alpha": model.named_steps["ridge"].alpha,
         "data_sha256": hashlib.sha256(FEATURES_CSV.read_bytes()).hexdigest(),
-        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "trained_at": _now(),
         "coefficients": table.to_dict(orient="records"),
-        "forced": bool(args.force),
+        "cumulative_brent_inr_effect": float(oil_rows["coef_raw"].sum()),
+        "forced": force,
     }
     (MODELS / f"lagged_gm_{latest}.json").write_text(json.dumps(meta, indent=2))
-    print(table.to_string(index=False))
-    return 0
+    typer.echo(table.to_string(index=False))
 
 
-def cmd_backtest(args):
-    try:
-        df = _load_features()
-    except FileNotFoundError as exc:
-        print(exc)
-        return 2
-    try:
-        _, summary = rolling_backtest(df, "gm_pct", LAG_FEATURES, min_train=args.min_train)
-    except InsufficientDataError as exc:
-        print("Cannot backtest:", exc)
-        return 3
-    REPORTS.mkdir(exist_ok=True)
+def _backtest(df: pd.DataFrame, min_train: int) -> None:
+    _, summary = rolling_backtest(df, TARGET, LAG_FEATURES, min_train=min_train)
+    REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / "backtest.json").write_text(json.dumps(summary, indent=2))
-    print(json.dumps(summary, indent=2))
-    return 0
+    typer.echo(json.dumps(summary, indent=2))
 
 
-def main(argv=None):
-    p = argparse.ArgumentParser(prog="pwl")
-    sub = p.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("validate").set_defaults(fn=cmd_validate)
-    sub.add_parser("leverage").set_defaults(fn=cmd_leverage)
-    ing = sub.add_parser("ingest")
-    ing.add_argument("--start", default="2015-01-01")
-    ing.set_defaults(fn=cmd_ingest)
-    sub.add_parser("features").set_defaults(fn=cmd_features)
-    tr = sub.add_parser("train")
-    tr.add_argument("--force", action="store_true")
-    tr.set_defaults(fn=cmd_train)
-    bt = sub.add_parser("backtest")
-    bt.add_argument("--min-train", type=int, default=12)
-    bt.set_defaults(fn=cmd_backtest)
-    args = p.parse_args(argv)
-    return args.fn(args)
+@app.command()
+def validate(
+    strict: bool = typer.Option(False, "--strict", help="Treat warnings as failures"),
+) -> None:
+    """Validate the VBL quarterly table."""
+    setup_logging()
+    df = _validated_vbl()
+    if strict and vbl_warnings(df):
+        _fail("Validation failed in strict mode (warnings above).")
+    typer.echo("Validation passed.")
+
+
+@app.command()
+def extract(
+    pdf_dir: Path = typer.Argument(..., help="Folder of VBL results PDFs"),
+    into: Path = typer.Option(VBL_CSV, "--into", help="Table to merge new quarters into"),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Replace quarters already present"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Report what would change, write nothing"
+    ),
+) -> None:
+    """Parse consolidated statements from PDFs into reconciled line items and merge them."""
+    setup_logging()
+    if not pdf_dir.is_dir():
+        _fail(f"{pdf_dir} is not a directory.", EXIT_MISSING)
+    try:
+        new = extract_directory(pdf_dir)
+    except ConfigurationError as exc:
+        _fail(exc.message)
+    if new.empty:
+        _fail("No consolidated statements found in the PDFs.")
+    existing = load_vbl(into).drop(columns="period") if into.exists() else new.iloc[0:0]
+    combined = merge_into_table(existing, new, overwrite=overwrite)
+    added = sorted(set(combined["quarter"]) - set(existing["quarter"]))
+    typer.echo(f"Parsed {len(new)} quarters; {len(added)} new: {', '.join(added) or 'none'}")
+    problems = check_vbl(combined)
+    if problems:
+        for p in problems:
+            typer.echo(f" - {p}", err=True)
+        _fail("Merged table failed validation, nothing written.")
+    for w in vbl_warnings(combined):
+        typer.echo(f"warning: {w}", err=True)
+    if dry_run:
+        typer.echo("Dry run: nothing written.")
+        return
+    combined.to_csv(into, index=False)
+    typer.echo(f"Wrote {into}")
+
+
+@app.command()
+def leverage() -> None:
+    """Fit the operating leverage model and write the report."""
+    setup_logging()
+    df = _validated_vbl()
+    try:
+        _fit_leverage_and_report(df)
+    except InsufficientDataError as exc:
+        _fail(f"Cannot fit: {exc.message}", EXIT_INSUFFICIENT)
+
+
+@app.command()
+def ingest(
+    start: str = typer.Option(settings.ingest_start_date, help="Start date for data ingestion"),
+) -> None:
+    """Ingest oil, FX and weather data from external APIs."""
+    setup_logging()
+    key = settings.fred_api_key
+    if not key:
+        _fail("FRED_API_KEY not set. Get a free key from fred.stlouisfed.org and export it.")
+    end = datetime.now(timezone.utc).date().isoformat()
+    typer.echo(f"Ingesting data from {start} to {end}...")
+    try:
+        brent = fred.fetch_series(fred.BRENT, key, start)
+        fx = fred.fetch_series(fred.USDINR, key, start)
+        weather = openmeteo.fetch_weighted(start, end)
+    except IngestionError as exc:
+        _fail(f"Ingestion failed ({exc.source}): {exc.message}")
+    save_snapshot(brent, "brent_daily", "FRED DCOILBRENTEU")
+    save_snapshot(fx, "usdinr_daily", "FRED DEXINUS")
+    save_snapshot(weather, "weather_daily", "Open-Meteo archive, population-weighted")
+    typer.echo(f"Snapshots written: brent={len(brent)} fx={len(fx)} weather={len(weather)} rows")
+
+
+@app.command()
+def features() -> None:
+    """Build the quarterly feature table from snapshots and the VBL table."""
+    setup_logging()
+    _validated_vbl()
+    try:
+        _build_features()
+    except FileNotFoundError as exc:
+        _fail(str(exc), EXIT_MISSING)
+
+
+@app.command()
+def train(
+    force: bool = typer.Option(False, "--force", help="Smoke run below the minimum quarter count"),
+) -> None:
+    """Train the distributed-lag ridge model on gross margin."""
+    setup_logging()
+    try:
+        _train(_load_features(), force)
+    except InsufficientDataError as exc:
+        _fail(f"Refusing to train: {exc.message}", EXIT_INSUFFICIENT)
+    except ModelTrainingError as exc:
+        _fail(f"Training failed: {exc.message}")
+    except FileNotFoundError as exc:
+        _fail(str(exc), EXIT_MISSING)
+
+
+@app.command()
+def backtest(
+    min_train: int = typer.Option(12, "--min-train", help="Minimum training quarters"),
+) -> None:
+    """Run the rolling-origin backtest against baselines."""
+    setup_logging()
+    try:
+        _backtest(_load_features(), min_train)
+    except InsufficientDataError as exc:
+        _fail(f"Cannot backtest: {exc.message}", EXIT_INSUFFICIENT)
+    except FileNotFoundError as exc:
+        _fail(str(exc), EXIT_MISSING)
+
+
+@app.command()
+def refit() -> None:
+    """Full pipeline: validate, leverage, features, train, backtest. Never forces training."""
+    setup_logging()
+    df = _validated_vbl()
+    typer.echo("[1/4] validation passed")
+    try:
+        _fit_leverage_and_report(df)
+    except InsufficientDataError as exc:
+        _fail(f"Cannot fit leverage: {exc.message}", EXIT_INSUFFICIENT)
+    typer.echo("[2/4] leverage model refreshed")
+    try:
+        _build_features()
+    except FileNotFoundError as exc:
+        _fail(str(exc), EXIT_MISSING)
+    typer.echo("[3/4] features built")
+    try:
+        features_df = _load_features()
+        _train(features_df, force=False)
+        _backtest(features_df, 12)
+    except InsufficientDataError as exc:
+        _fail(
+            f"Lag model skipped: {exc.message}\n"
+            "The leverage model and report were still refreshed.",
+            EXIT_INSUFFICIENT,
+        )
+    except PWLError as exc:
+        _fail(f"Error: {exc.message}")
+    typer.echo("[4/4] lag model trained and backtested")
+
+
+def main() -> None:
+    """Entry point for the CLI."""
+    app()
+
+
+if __name__ == "__main__":
+    main()

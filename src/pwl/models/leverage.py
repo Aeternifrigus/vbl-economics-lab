@@ -1,36 +1,49 @@
 """Operating leverage model: opex = fixed + variable * revenue, so margin swings with volume."""
+
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import numpy as np
+import pandas as pd
 from scipy import stats
+
+from ..exceptions import InsufficientDataError
+from ..logging_config import get_logger
+
+logger = get_logger(__name__)
+
+MIN_QUARTERS = 4
 
 
 @dataclass
 class LeverageFit:
+    """Results from operating leverage regression."""
+
     n: int
     fixed_cr: float
     var_cost_ratio: float
     r2: float
     se_fixed: float
     se_var: float
-    ci90_fixed: tuple
-    ci90_var: tuple
+    ci90_fixed: tuple[float, float]
+    ci90_var: tuple[float, float]
     loo_rmse_opm_pp: float
     loo_rmse_opex_cr: float
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["ci90_fixed"] = list(self.ci90_fixed)
         d["ci90_var"] = list(self.ci90_var)
         return d
 
 
-def _ols(x, y):
+def _ols(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray, float, int]:
+    """Ordinary least squares with standard errors."""
     X = np.column_stack([np.ones_like(x, dtype=float), x])
     beta, *_ = np.linalg.lstsq(X, y, rcond=None)
     resid = y - X @ beta
     dof = len(y) - 2
-    s2 = float(resid @ resid) / dof
+    s2 = float(resid @ resid) / dof if dof > 0 else 0.0
     cov = s2 * np.linalg.inv(X.T @ X)
     se = np.sqrt(np.diag(cov))
     ss_tot = float(((y - y.mean()) ** 2).sum())
@@ -38,13 +51,19 @@ def _ols(x, y):
     return beta, se, r2, dof
 
 
-def fit_leverage(df):
+def fit_leverage(df: pd.DataFrame) -> LeverageFit:
     """Fit opex on revenue (both in crore). Needs at least 4 quarters."""
-    if len(df) < 4:
-        raise ValueError("need at least 4 quarters to fit operating leverage")
+    if len(df) < MIN_QUARTERS:
+        raise InsufficientDataError(
+            "need at least 4 quarters to fit operating leverage",
+            available=len(df),
+            required=MIN_QUARTERS,
+        )
+
     rev = df["revenue_cr"].to_numpy(dtype=float)
     opex = df["opex_cr"].to_numpy(dtype=float)
     gm = (df["gross_profit_cr"] / df["revenue_cr"] * 100).to_numpy(dtype=float)
+
     beta, se, r2, dof = _ols(rev, opex)
     tcrit = stats.t.ppf(0.95, dof)
 
@@ -58,7 +77,7 @@ def fit_leverage(df):
         true_opm = gm[i] - opex[i] / rev[i] * 100
         errs_opm.append(pred_opm - true_opm)
 
-    return LeverageFit(
+    fit = LeverageFit(
         n=len(rev),
         fixed_cr=float(beta[0]),
         var_cost_ratio=float(beta[1]),
@@ -71,20 +90,31 @@ def fit_leverage(df):
         loo_rmse_opex_cr=float(np.sqrt(np.mean(np.square(errs_opex)))),
     )
 
+    logger.info(
+        "Leverage fit: n=%d R2=%.3f fixed=%.0fcr var=%.1f%%",
+        fit.n,
+        fit.r2,
+        fit.fixed_cr,
+        fit.var_cost_ratio * 100,
+    )
+    return fit
 
-def predict_opm_pp(fit, revenue_cr, gross_margin_pct):
+
+def predict_opm_pp(fit: LeverageFit, revenue_cr: float, gross_margin_pct: float) -> float:
+    """Predict EBITDA margin percentage points."""
     opex = fit.fixed_cr + fit.var_cost_ratio * revenue_cr
     return gross_margin_pct - opex / revenue_cr * 100
 
 
-def variance_decomposition(df):
+def variance_decomposition(df: pd.DataFrame) -> dict[str, float]:
     """Split Var(OPM) = Var(GM) + Var(opex ratio) - 2 Cov(GM, opex ratio) into shares."""
     gm = (df["gross_profit_cr"] / df["revenue_cr"] * 100).to_numpy(dtype=float)
     ratio = (df["opex_cr"] / df["revenue_cr"] * 100).to_numpy(dtype=float)
     opm = gm - ratio
     var_opm = np.var(opm, ddof=1)
     cov = np.cov(gm, ratio, ddof=1)
-    return {
+
+    result = {
         "var_opm": float(var_opm),
         "share_gross_margin": float(cov[0, 0] / var_opm),
         "share_opex_ratio": float(cov[1, 1] / var_opm),
@@ -93,8 +123,17 @@ def variance_decomposition(df):
         "opex_ratio_range_pp": float(ratio.max() - ratio.min()),
     }
 
+    logger.info(
+        "Variance decomp: GM=%.1f%% opex_ratio=%.1f%% cov=%.1f%%",
+        result["share_gross_margin"] * 100,
+        result["share_opex_ratio"] * 100,
+        result["share_covariance"] * 100,
+    )
+    return result
 
-def render_report(df, fit, decomp):
+
+def render_report(df: pd.DataFrame, fit: LeverageFit, decomp: dict[str, float]) -> str:
+    """Generate markdown report."""
     lines = [
         "# Operating leverage in VBL quarterly margins",
         "",
@@ -106,15 +145,21 @@ def render_report(df, fit, decomp):
     for _, r in df.iterrows():
         gm = r["gross_profit_cr"] / r["revenue_cr"] * 100
         ratio = r["opex_cr"] / r["revenue_cr"] * 100
-        lines.append(f"| {r['quarter']} | {r['revenue_cr']:.0f} | {gm:.2f} | {ratio:.2f} | {gm - ratio:.2f} |")
+        lines.append(
+            f"| {r['quarter']} | {r['revenue_cr']:.0f} | {gm:.2f} | "
+            f"{ratio:.2f} | {gm - ratio:.2f} |"
+        )
     lines += [
         "",
         "## Fit: opex = fixed + variable x revenue",
         "",
         f"- n = {fit.n} quarters, R squared = {fit.r2:.3f}",
-        f"- fixed cost: {fit.fixed_cr:.0f} cr per quarter (90% CI {fit.ci90_fixed[0]:.0f} to {fit.ci90_fixed[1]:.0f})",
-        f"- variable cost: {fit.var_cost_ratio * 100:.1f}% of revenue (90% CI {fit.ci90_var[0] * 100:.1f}% to {fit.ci90_var[1] * 100:.1f}%)",
-        f"- leave-one-out error: {fit.loo_rmse_opm_pp:.2f} pp on EBITDA margin, {fit.loo_rmse_opex_cr:.0f} cr on opex",
+        f"- fixed cost: {fit.fixed_cr:.0f} cr per quarter "
+        f"(90% CI {fit.ci90_fixed[0]:.0f} to {fit.ci90_fixed[1]:.0f})",
+        f"- variable cost: {fit.var_cost_ratio * 100:.1f}% of revenue "
+        f"(90% CI {fit.ci90_var[0] * 100:.1f}% to {fit.ci90_var[1] * 100:.1f}%)",
+        f"- leave-one-out error: {fit.loo_rmse_opm_pp:.2f} pp on EBITDA margin, "
+        f"{fit.loo_rmse_opex_cr:.0f} cr on opex",
         "",
         "## Where the EBITDA margin swing comes from",
         "",
@@ -126,9 +171,31 @@ def render_report(df, fit, decomp):
         "",
         "## Caveats",
         "",
-        "- Six quarters is a descriptive fit, not a forecasting model. Treat the intervals as wide.",
-        "- Margins here are computed as (gross profit - opex) / revenue from the filings table. The company",
-        "  reports a slightly different EBITDA margin for some quarters (for example 27.7% against 27.1% for 2026Q2).",
+        f"- n = {fit.n} quarters is a descriptive fit, not a forecasting model. "
+        "Treat the intervals as wide.",
+        *_coverage_notes(df, fit),
+        "- Gross profit is revenue minus materials, excise duty, purchases of stock-in-trade",
+        "  and the change in inventories. Opex is employee benefits plus other expenses.",
+        "  EBITDA is the difference. Margins are computed from these line items and can differ",
+        "  slightly from the company's own reported EBITDA margin.",
         "- These are VBL consolidated numbers across all products, not packaged water alone.",
     ]
     return "\n".join(lines) + "\n"
+
+
+def _coverage_notes(df: pd.DataFrame, fit: LeverageFit) -> list[str]:
+    """Extra caveats that depend on the data actually used."""
+    notes = []
+    periods = pd.PeriodIndex(df["quarter"], freq="Q")
+    full = pd.period_range(periods.min(), periods.max(), freq="Q")
+    if len(full) > len(periods):
+        notes.append(
+            f"- Coverage has gaps: {len(periods)} of {len(full)} quarters between "
+            f"{periods.min()} and {periods.max()}."
+        )
+    if fit.fixed_cr < 0:
+        notes.append(
+            "- The fixed-cost estimate is negative, which is not economically meaningful. "
+            "The linear fixed-plus-variable form does not describe this data well."
+        )
+    return notes

@@ -1,0 +1,26 @@
+{
+  "brent_daily": {
+    "fetched_at": "2026-10-31T18:31:07+00:00",
+    "rows": 3001,
+    "sha256": "799b42e102ba6a7437045614e527581b219cf005a6a109b988df7f49bbd0789c",
+    "source": "FRED DCOILBRENTEU"
+  },
+  "features_quarterly": {
+    "fetched_at": "2026-10-31T23:11:57+00:00",
+    "rows": 9,
+    "sha256": "d405ea4d5629c4e382cbbc160fef5c526e388e1a0f77cddeb0702e8b2448623b",
+    "source": "built from snapshots and vbl_quarterly.csv"
+  },
+  "usdinr_daily": {
+    "fetched_at": "2026-10-31T18:31:07+00:00",
+    "rows": 2952,
+    "sha256": "5956831fb90f801228d5ac6e5658308f18039b08963f6784c587f7d22311fe3e",
+    "source": "FRED DEXINUS"
+  },
+  "weather_daily": {
+    "fetched_at": "2026-10-31T18:31:07+00:00",
+    "rows": 4322,
+    "sha256": "f3bad938c00eea9d1aaf53c1c30223f96c3335bcd2195fcd8d7e067e4dfa4b55",
+    "source": "Open-Meteo archive, population-weighted"
+  }
+}

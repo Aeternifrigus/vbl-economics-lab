@@ -4,7 +4,12 @@ import pytest
 
 from pwl.backtest import rolling_backtest
 from pwl.exceptions import InsufficientDataError
-from pwl.models.lagged import coef_table, fit_lagged_ridge, seasonal_naive
+from pwl.models.lagged import (
+    coef_table,
+    cumulative_effect_interval,
+    fit_lagged_ridge,
+    seasonal_naive,
+)
 
 
 def _synthetic(n=80, seed=3):
@@ -83,3 +88,16 @@ def test_backtest_reports_skill_against_baselines():
         "mae_last_value",
         "skill_vs_seasonal_naive",
     }
+
+
+def test_bootstrap_interval_brackets_the_planted_cumulative_effect():
+    df = _synthetic()
+    oil = ["oil_lag0", "oil_lag1", "oil_lag2", "oil_lag3"]
+    low, high = cumulative_effect_interval(df, "gm", FEATS, oil, alpha=0.1, n_boot=60)
+    assert low < high
+    assert low < -1.5 < high  # true cumulative effect is -0.2 - 1.0 - 0.3
+
+
+def test_bootstrap_refuses_tiny_samples():
+    with pytest.raises(InsufficientDataError):
+        cumulative_effect_interval(_synthetic(n=6), "gm", FEATS, ["oil_lag1"], alpha=1.0, n_boot=5)

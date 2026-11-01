@@ -40,10 +40,11 @@ def test_exit_code_is_not_swallowed_into_a_second_error(runner, sandbox, real_vb
 
 
 def test_leverage_writes_model_and_report(runner, sandbox, real_vbl):
+    n = len(pd.read_csv(real_vbl))
     result = _invoke(runner, "leverage")
-    assert "n=9" in result.output
+    assert f"n={n}" in result.output
     report = (sandbox["REPORTS"] / "operating_leverage.md").read_text()
-    assert "n = 9 quarters" in report
+    assert f"n = {n} quarters" in report
     assert "Coverage has gaps" in report
     assert "Six quarters" not in report
 
@@ -78,7 +79,7 @@ def test_ingest_failure_is_reported(runner, sandbox, monkeypatch):
 
 def _fake_extraction(monkeypatch):
     rows = merge_rows(extract_from_pages(split_pages(FIXTURE.read_text()), "1-2.-Results.pdf"))
-    monkeypatch.setattr(cli, "extract_directory", lambda path: rows)
+    monkeypatch.setattr(cli, "extract_directory", lambda path, manual=None, ocr=False: rows)
 
 
 def test_extract_dry_run_then_merge(runner, sandbox, real_vbl, monkeypatch, tmp_path):
@@ -97,7 +98,9 @@ def test_extract_dry_run_then_merge(runner, sandbox, real_vbl, monkeypatch, tmp_
 
 
 def test_extract_with_no_statements_fails(runner, sandbox, real_vbl, monkeypatch, tmp_path):
-    monkeypatch.setattr(cli, "extract_directory", lambda path: pd.DataFrame())
+    monkeypatch.setattr(
+        cli, "extract_directory", lambda path, manual=None, ocr=False: pd.DataFrame()
+    )
     _invoke(runner, "extract", str(tmp_path), "--into", str(real_vbl), expect=1)
 
 

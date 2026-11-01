@@ -1,5 +1,6 @@
 """Distributed-lag ridge model for gross margin on lagged oil cost and weather."""
 
+import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
@@ -17,7 +18,7 @@ def fit_lagged_ridge(
     df: pd.DataFrame,
     target: str,
     features: list[str],
-    alphas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0),
+    alphas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0),
     force: bool = False,
 ) -> Pipeline:
     """Fit a distributed-lag ridge regression with time-series cross-validation."""
@@ -80,3 +81,40 @@ def coef_table(model: Pipeline, features: list[str]) -> pd.DataFrame:
 def seasonal_naive(series: pd.Series, period: int = 4) -> pd.Series:
     """Seasonal naive forecast (same quarter previous year)."""
     return series.shift(period)
+
+
+def cumulative_effect_interval(
+    df: pd.DataFrame,
+    target: str,
+    features: list[str],
+    effect_features: list[str],
+    alpha: float,
+    n_boot: int = 300,
+    block: int = 4,
+    seed: int = 0,
+    level: float = 0.9,
+) -> tuple[float, float]:
+    """Moving-block bootstrap interval for the summed raw coefficient of `effect_features`.
+
+    Blocks of consecutive quarters keep short-run dependence intact. The ridge penalty is held at
+    the value chosen for the main fit so the interval reflects sampling noise, not tuning.
+    """
+    d = df[[target, *features]].dropna().reset_index(drop=True)
+    n = len(d)
+    if n < block * 2:
+        raise InsufficientDataError(
+            f"{n} usable quarters is too few for a block bootstrap", available=n, required=block * 2
+        )
+    rng = np.random.default_rng(seed)
+    effects = []
+    for _ in range(n_boot):
+        rows: list[int] = []
+        while len(rows) < n:
+            start = int(rng.integers(0, n - block + 1))
+            rows.extend(range(start, start + block))
+        sample = d.iloc[rows[:n]].reset_index(drop=True)
+        model = fit_lagged_ridge(sample, target, features, alphas=(alpha,), force=True)
+        table = coef_table(model, features).set_index("feature")["coef_raw"]
+        effects.append(float(table.loc[effect_features].sum()))
+    lo, hi = np.percentile(effects, [(1 - level) / 2 * 100, (1 + level) / 2 * 100])
+    return float(lo), float(hi)

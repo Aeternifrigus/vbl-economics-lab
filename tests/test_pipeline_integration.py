@@ -35,8 +35,17 @@ def test_full_pipeline_recovers_the_known_signal(runner, sandbox, synthetic_vbl,
     assert abs(coefs["brent_inr_lag1"]) > 3 * abs(coefs["brent_inr_lag3"])
     assert meta["cumulative_brent_inr_effect"] == pytest.approx(TRUE_LAG1_COEF, rel=0.5)
 
+    low, high = meta["cumulative_brent_inr_effect_ci90"]
+    assert low < TRUE_LAG1_COEF < high
+    assert meta["gm_points_per_10usd_brent"]["estimate"] < 0  # 10 USD of Brent at 80 INR/USD
+
     summary = json.loads((sandbox["REPORTS"] / "backtest.json").read_text())
     assert summary["skill_vs_seasonal_naive"] > 0.3
+    ablation = summary["ablation"]
+    assert set(ablation) == {"seasonal_only", "seasonal_plus_oil", "seasonal_plus_weather", "all"}
+    # The planted signal is in oil, so adding oil to seasonality must help and weather must not.
+    assert ablation["seasonal_plus_oil"]["mae"] < 0.5 * ablation["seasonal_only"]["mae"]
+    assert ablation["seasonal_plus_weather"]["mae"] > 0.8 * ablation["seasonal_only"]["mae"]
     assert (sandbox["MODELS"] / f"lagged_gm_{meta['latest_quarter']}.joblib").exists()
 
 
@@ -49,7 +58,7 @@ def test_refit_runs_every_stage_without_forcing(runner, sandbox, synthetic_vbl, 
     assert meta["forced"] is False
 
 
-def test_guard_blocks_the_lag_model_on_the_real_table(runner, sandbox, real_vbl, fake_apis):
+def test_guard_blocks_the_lag_model_on_a_short_table(runner, sandbox, short_vbl, fake_apis):
     _run(runner, "ingest")
     _run(runner, "features")
     train = _run(runner, "train", expect=3)
@@ -58,8 +67,8 @@ def test_guard_blocks_the_lag_model_on_the_real_table(runner, sandbox, real_vbl,
     assert not list(sandbox["MODELS"].glob("lagged_gm_*"))
 
 
-def test_refit_on_real_table_still_refreshes_leverage_then_exits_3(
-    runner, sandbox, real_vbl, fake_apis
+def test_refit_on_a_short_table_still_refreshes_leverage_then_exits_3(
+    runner, sandbox, short_vbl, fake_apis
 ):
     _run(runner, "ingest")
     result = _run(runner, "refit", expect=3)

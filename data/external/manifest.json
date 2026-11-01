@@ -6,9 +6,9 @@
     "source": "FRED DCOILBRENTEU"
   },
   "features_quarterly": {
-    "fetched_at": "2026-10-31T23:11:57+00:00",
-    "rows": 9,
-    "sha256": "d405ea4d5629c4e382cbbc160fef5c526e388e1a0f77cddeb0702e8b2448623b",
+    "fetched_at": "2026-11-01T10:06:08+00:00",
+    "rows": 38,
+    "sha256": "a007760a88cba8082648985180a363bb36b7ab6e6bbf89656dafbb9724378d61",
     "source": "built from snapshots and vbl_quarterly.csv"
   },
   "usdinr_daily": {

@@ -1,0 +1,33 @@
+{
+  "model": "operating_leverage_ols",
+  "latest_quarter": "2026Q3",
+  "n_quarters": 38,
+  "data_sha256": "f729e2b222e04b3490f1a628e0199223270cc356ba9f3776852035f7e8c00853",
+  "trained_at": "2026-11-01T10:06:08+00:00",
+  "fit": {
+    "n": 38,
+    "fixed_cr": 205.09271011982398,
+    "var_cost_ratio": 0.2621695384247132,
+    "r2": 0.9333283333024285,
+    "se_fixed": 44.71049228369401,
+    "se_var": 0.011678428604880045,
+    "ci90_fixed": [
+      129.60808820022586,
+      280.5773320394221
+    ],
+    "ci90_var": [
+      0.24245287410661778,
+      0.2818862027428086
+    ],
+    "loo_rmse_opm_pp": 6.481583083431985,
+    "loo_rmse_opex_cr": 154.29089927715924
+  },
+  "variance_decomposition": {
+    "var_opm": 40.230083574742196,
+    "share_gross_margin": 0.221082161110913,
+    "share_opex_ratio": 1.896997791756006,
+    "share_covariance": -1.1180799528669183,
+    "gm_range_pp": 15.509296710285433,
+    "opex_ratio_range_pp": 35.28035369618802
+  }
+}

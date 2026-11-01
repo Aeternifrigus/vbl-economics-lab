@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # Ingestion
     ingest_start_date: str = Field(default="2015-01-01", alias="INGEST_START_DATE")
+    bootstrap_samples: int = Field(default=300, alias="BOOTSTRAP_SAMPLES")
 
     # Logging
     log_level: str = Field(default="WARNING", alias="LOG_LEVEL")

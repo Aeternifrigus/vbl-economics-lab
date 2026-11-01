@@ -15,7 +15,7 @@ import pandas as pd
 import typer
 
 from .backtest import rolling_backtest
-from .config import DATA_EXT, DATA_RAW, LAG_FEATURES, MODELS, REPORTS
+from .config import ABLATIONS, DATA_EXT, DATA_RAW, LAG_FEATURES, MODELS, REPORTS
 from .exceptions import (
     ConfigurationError,
     IngestionError,
@@ -27,7 +27,7 @@ from .extract import extract_directory, merge_into_table
 from .features import build_table, quarterly_oil_fx, quarterly_weather
 from .ingest import fred, openmeteo
 from .logging_config import setup_logging
-from .models.lagged import coef_table, fit_lagged_ridge
+from .models.lagged import coef_table, cumulative_effect_interval, fit_lagged_ridge
 from .models.leverage import fit_leverage, render_report, variance_decomposition
 from .settings import settings
 from .snapshot import save_snapshot
@@ -40,6 +40,7 @@ app = typer.Typer(
 )
 
 VBL_CSV = DATA_RAW / "vbl_quarterly.csv"
+MANUAL_CSV = DATA_RAW / "manual_statements.csv"
 FEATURES_CSV = DATA_EXT / "features_quarterly.csv"
 TARGET = "gm_pct"
 
@@ -143,7 +144,16 @@ def _train(df: pd.DataFrame, force: bool) -> None:
     table = coef_table(model, LAG_FEATURES)
     # Oil lags are highly correlated in real data, so individual lag coefficients are unstable.
     # The cumulative effect across lags is the number to quote.
-    oil_rows = table[table["feature"].str.startswith("brent_inr_lag")]
+    oil_features = [f for f in LAG_FEATURES if f.startswith("brent_inr_lag")]
+    oil_rows = table[table["feature"].isin(oil_features)]
+    alpha = float(model.named_steps["ridge"].alpha)
+    effect = float(oil_rows["coef_raw"].sum())
+    low, high = cumulative_effect_interval(
+        df, TARGET, LAG_FEATURES, oil_features, alpha, n_boot=settings.bootstrap_samples
+    )
+    # Translate to something readable: gross margin points per 10 USD/bbl, at the average USD/INR.
+    rate = float(df["usdinr"].mean()) if "usdinr" in df.columns else None
+    per_10usd = None if rate is None else [round(v * 10 * rate, 3) for v in (effect, low, high)]
     meta = {
         "model": "distributed_lag_ridge",
         "target": TARGET,
@@ -152,7 +162,11 @@ def _train(df: pd.DataFrame, force: bool) -> None:
         "data_sha256": hashlib.sha256(FEATURES_CSV.read_bytes()).hexdigest(),
         "trained_at": _now(),
         "coefficients": table.to_dict(orient="records"),
-        "cumulative_brent_inr_effect": float(oil_rows["coef_raw"].sum()),
+        "cumulative_brent_inr_effect": effect,
+        "cumulative_brent_inr_effect_ci90": [low, high],
+        "gm_points_per_10usd_brent": None
+        if per_10usd is None
+        else {"estimate": per_10usd[0], "ci90": [per_10usd[1], per_10usd[2]]},
         "forced": force,
     }
     (MODELS / f"lagged_gm_{latest}.json").write_text(json.dumps(meta, indent=2))
@@ -161,6 +175,14 @@ def _train(df: pd.DataFrame, force: bool) -> None:
 
 def _backtest(df: pd.DataFrame, min_train: int) -> None:
     _, summary = rolling_backtest(df, TARGET, LAG_FEATURES, min_train=min_train)
+    ablation = {}
+    for name, feature_set in ABLATIONS.items():
+        _, result = rolling_backtest(df, TARGET, feature_set, min_train=min_train)
+        ablation[name] = {
+            "mae": result["mae_model"],
+            "skill_vs_seasonal_naive": result["skill_vs_seasonal_naive"],
+        }
+    summary["ablation"] = ablation
     REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / "backtest.json").write_text(json.dumps(summary, indent=2))
     typer.echo(json.dumps(summary, indent=2))
@@ -186,13 +208,17 @@ def extract(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Report what would change, write nothing"
     ),
+    manual: Path = typer.Option(MANUAL_CSV, "--manual", help="Hand-entered statements for scans"),
+    ocr: bool = typer.Option(
+        False, "--ocr", help="OCR scanned pages (slow, rarely passes tie-out)"
+    ),
 ) -> None:
     """Parse consolidated statements from PDFs into reconciled line items and merge them."""
     setup_logging()
     if not pdf_dir.is_dir():
         _fail(f"{pdf_dir} is not a directory.", EXIT_MISSING)
     try:
-        new = extract_directory(pdf_dir)
+        new = extract_directory(pdf_dir, manual=manual, ocr=ocr)
     except ConfigurationError as exc:
         _fail(exc.message)
     if new.empty:

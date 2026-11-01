@@ -1,0 +1,25 @@
+{
+  "n_test_quarters": 26,
+  "mae_model": 1.5393167758506756,
+  "mae_seasonal_naive": 1.8968232021484335,
+  "mae_last_value": 1.8701447086615266,
+  "skill_vs_seasonal_naive": 0.1884764093421194,
+  "ablation": {
+    "seasonal_only": {
+      "mae": 1.7562072119429182,
+      "skill_vs_seasonal_naive": 0.07413236512830867
+    },
+    "seasonal_plus_oil": {
+      "mae": 1.5393167758506756,
+      "skill_vs_seasonal_naive": 0.1884764093421194
+    },
+    "seasonal_plus_weather": {
+      "mae": 1.8050055116713835,
+      "skill_vs_seasonal_naive": 0.048406035087009136
+    },
+    "all": {
+      "mae": 1.6508250197184506,
+      "skill_vs_seasonal_naive": 0.1296895684064564
+    }
+  }
+}

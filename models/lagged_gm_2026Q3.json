@@ -1,0 +1,58 @@
+{
+  "model": "distributed_lag_ridge",
+  "target": "gm_pct",
+  "latest_quarter": "2026Q3",
+  "alpha": 10.0,
+  "data_sha256": "a007760a88cba8082648985180a363bb36b7ab6e6bbf89656dafbb9724378d61",
+  "trained_at": "2026-11-01T10:06:19+00:00",
+  "coefficients": [
+    {
+      "feature": "brent_inr_lag0",
+      "coef_std": -0.5127271818979583,
+      "coef_raw": -0.00029263779682187183
+    },
+    {
+      "feature": "brent_inr_lag1",
+      "coef_std": -0.1537484281278671,
+      "coef_raw": -8.986354497946564e-05
+    },
+    {
+      "feature": "brent_inr_lag2",
+      "coef_std": -0.28371436305264713,
+      "coef_raw": -0.0001774880750848347
+    },
+    {
+      "feature": "brent_inr_lag3",
+      "coef_std": 0.012439794943469588,
+      "coef_raw": 7.627053570309475e-06
+    },
+    {
+      "feature": "q2",
+      "coef_std": -0.5826102736674503,
+      "coef_raw": -1.3703814827252911
+    },
+    {
+      "feature": "q3",
+      "coef_std": -0.09817624804515825,
+      "coef_raw": -0.22295181479929763
+    },
+    {
+      "feature": "q4",
+      "coef_std": 1.0867975187275014,
+      "coef_raw": 2.468045825179808
+    }
+  ],
+  "cumulative_brent_inr_effect": -0.0005523623633158627,
+  "cumulative_brent_inr_effect_ci90": [
+    -0.0008453845392565279,
+    -0.00031555847839618255
+  ],
+  "gm_points_per_10usd_brent": {
+    "estimate": -0.429,
+    "ci90": [
+      -0.657,
+      -0.245
+    ]
+  },
+  "forced": false
+}

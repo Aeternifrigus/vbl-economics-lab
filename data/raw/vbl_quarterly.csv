@@ -1,10 +1,39 @@
-quarter,revenue_cr,gross_profit_cr,opex_cr,ebitda_cr,volume_growth_yoy_pct,volume_note,source
-2022Q1,2867.5,1457.3,926.3,531.0,,,file:1-2.-Results.pdf#p1
-2022Q4,2257.2,1246.4,938.9,307.5,,,file:1-2.-Results.pdf#p1
-2023Q1,3952.6,2041.3,1243.2,798.0,,,file:1-2.-Results.pdf#p1
-2025Q1,5680.0,3151.0,1887.0,1264.0,,,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
-2025Q2,7163.0,3972.0,1973.0,1999.0,-3.0,consolidated; domestic decline attributed to rain,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
-2025Q3,5048.0,2929.0,1781.0,1147.0,2.4,consolidated; India flat on weather,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
-2025Q4,4335.0,2459.0,1819.0,639.0,,,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
-2026Q1,6722.0,3776.0,2247.0,1529.0,16.3,consolidated,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
-2026Q2,8651.0,4844.0,2501.0,2343.0,19.8,consolidated; includes Twizza (11.8M cases); India organic +14.4,https://www.stockezee.com/stocks/vbl/results (aggregates NSE and BSE filings)
+quarter,revenue_cr,excise_duty_cr,gross_profit_cr,opex_cr,ebitda_cr,volume_growth_yoy_pct,volume_note,source
+2016Q4,487.8,53.6,258.8,232.6,26.2,,,file:1-Financial-Statements-for-Q4-2017.pdf#p3
+2017Q3,988.0,24.6,528.2,342.8,185.4,,,file:1-Financial-Statements-for-Q4-2017.pdf#p3
+2017Q4,543.3,16.0,335.6,313.1,22.5,,,file:1-Financial-Statements-for-Q4-2017.pdf#p3
+2018Q1,1122.4,27.6,603.2,430.5,172.7,,,file:3-Results.pdf#p1
+2018Q2,2097.1,38.0,1100.3,525.4,574.9,,,file:2-Financial-Results.pdf#p2 (read from the page image; scan has no usable text)
+2018Q3,1204.5,38.7,639.0,427.8,211.2,,,file:2.-Financial-Results-3.pdf#p5
+2018Q4,804.1,18.5,518.7,470.9,47.8,,,file:3-Results.pdf#p1
+2019Q1,1380.6,21.5,760.3,542.0,218.4,,,file:3-Results.pdf#p1
+2019Q2,2851.5,41.0,1480.9,693.1,787.9,,,file:2.-Financial-Results-3.pdf#p5
+2019Q3,1776.9,37.1,992.6,666.9,325.7,,,file:2.-Financial-Results-3.pdf#p5
+2019Q4,1239.5,19.3,676.3,560.6,115.7,,,file:2.-FinancialsQ1.pdf#p1
+2020Q1,1699.2,22.8,985.0,713.8,271.2,,,file:2.-FinancialsQ1.pdf#p1
+2020Q2,1665.7,25.5,899.1,521.4,377.7,,,file:2.-Financial-Results-2.pdf#p2
+2020Q3,1839.5,36.9,1001.6,620.9,380.8,,,file:3-2.-Financial-Results.pdf#p1
+2020Q4,1351.3,20.4,800.5,628.3,172.2,,,file:3-2.-Financial-Results.pdf#p1
+2021Q1,2269.9,29.0,1250.7,869.1,381.6,,,file:2.-Financial-Results-1-1.pdf#p1
+2021Q2,2483.0,33.2,1311.5,740.7,570.8,,,file:2.-Results-2.pdf#p1
+2021Q3,2440.4,42.3,1265.8,771.2,494.7,,,file:2.-Results-2.pdf#p1
+2021Q4,1764.9,30.6,960.5,753.0,207.6,,,file:3-2.-Results.pdf#p1
+2022Q1,2867.5,40.0,1457.3,926.3,531.0,,,file:2.-Results.pdf#p1
+2022Q2,5017.6,62.8,2503.0,1252.4,1250.6,,,file:2.-Financial-Results.pdf#p2
+2022Q3,3248.3,71.7,1705.3,1006.3,699.0,,,file:2.-Results-1.pdf#p1
+2022Q4,2257.2,43.0,1246.4,938.9,307.5,,,file:2.-Results-3.pdf#p1
+2023Q1,3952.6,59.6,2041.3,1243.2,798.0,,,file:1-2.-Results.pdf#p1
+2023Q2,5699.7,88.3,2944.8,1433.8,1511.0,,,file:2.-Results (1).pdf#p2
+2023Q3,3937.8,67.2,2140.8,1258.7,882.1,,,file:2.-Financial-Results (1).pdf#p1
+2023Q4,2731.0,63.3,1510.8,1092.5,418.3,,,file:1-2.-Results (1).pdf#p1
+2024Q1,4398.0,80.7,2429.8,1441.0,988.8,,,file:2.-Financials.pdf#p2
+2024Q2,7333.7,136.8,3936.3,1945.1,1991.2,,,file:2.-Financials.pdf#p2
+2024Q3,4932.1,127.4,2668.3,1517.2,1151.1,,,file:2.-Financials (1).pdf#p1
+2024Q4,3817.6,128.8,2068.6,1488.6,580.0,,,file:2.-Result.pdf#p1
+2025Q1,5680.0,113.1,3037.9,1773.9,1264.0,,,file:2.-Results (2).pdf#p1
+2025Q2,7163.0,145.7,3826.3,1827.5,1998.8,-3.0,consolidated; domestic decline attributed to rain,file:2.-Result (1).pdf#p1
+2025Q3,5047.7,151.1,2777.4,1630.1,1147.4,2.4,consolidated; India flat on weather,file:2.-Financial-Results (2).pdf#p1
+2025Q4,4334.8,130.4,2328.4,1689.1,639.3,,,file:2.-Financials (2).pdf#p1
+2026Q1,6721.5,147.3,3628.5,2099.6,1528.9,16.3,consolidated,file:2.-Financial-Result.pdf#p1
+2026Q2,8650.6,199.3,4644.9,2301.8,2343.0,19.8,consolidated; includes Twizza (11.8M cases); India organic +14.4,file:2.-Financial-Result.pdf#p1
+2026Q3,6815.6,208.0,3508.2,2081.5,1426.7,,,file:2.-Financial-Results (3).pdf#p1 (read from the page image; scan has no usable text)

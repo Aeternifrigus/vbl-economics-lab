@@ -14,5 +14,6 @@ the full statement for 2023Q1:
 - "EBITDA" was the wrong line (about 5% of revenue against 22% to 28% reported), and was later
   overwritten as gross profit minus opex, which made the validation identity pass by construction.
 
-The reconciled table is `data/raw/vbl_quarterly.csv`. The parser that produces correct line items is
-`src/pwl/extract.py` (run it with `python -m pwl extract PDF_DIR`).
+The reconciled table is `data/raw/vbl_quarterly.csv`, rebuilt from the original results PDFs. The
+parser that produces correct line items is `src/pwl/extract.py` (run it with
+`python -m pwl extract PDF_DIR`). Every accepted column ties out to the filing's own totals.

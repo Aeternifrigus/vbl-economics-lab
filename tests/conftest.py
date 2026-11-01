@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 from synthetic import daily_inputs, vbl_table
 from typer.testing import CliRunner
@@ -25,6 +26,7 @@ def sandbox(tmp_path, monkeypatch):
     for name, value in paths.items():
         monkeypatch.setattr(cli, name, value)
     monkeypatch.setattr(snapshot, "DATA_EXT", ext)
+    monkeypatch.setattr(cli.settings, "bootstrap_samples", 40)  # keep integration tests fast
     ext.mkdir()
     return paths
 
@@ -45,6 +47,13 @@ def synthetic_vbl(world, sandbox):
 @pytest.fixture
 def real_vbl(sandbox):
     sandbox["VBL_CSV"].write_text((DATA_RAW / "vbl_quarterly.csv").read_text())
+    return sandbox["VBL_CSV"]
+
+
+@pytest.fixture
+def short_vbl(sandbox):
+    """Real rows, but only nine of them, so the 20-quarter guard applies."""
+    pd.read_csv(DATA_RAW / "vbl_quarterly.csv").tail(9).to_csv(sandbox["VBL_CSV"], index=False)
     return sandbox["VBL_CSV"]
 
 

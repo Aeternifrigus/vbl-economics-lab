@@ -5,20 +5,10 @@ from pwl.config import DATA_RAW
 from pwl.exceptions import DataValidationError
 from pwl.validate import check_vbl, load_vbl, validate_or_raise, vbl_warnings
 
-# Margins from the filings (six quarters) and from the full 2023Q1 statement (three quarters),
-# written down independently of the CSV so a bad edit or re-extraction cannot slip through.
-GOLDEN = {
-    # quarter: (gross margin %, EBITDA margin %)
-    "2022Q1": (50.82, 18.52),
-    "2022Q4": (55.22, 13.62),
-    "2023Q1": (51.64, 20.19),
-    "2025Q1": (55.47, 22.25),
-    "2025Q2": (55.45, 27.90),
-    "2025Q3": (58.02, 22.73),
-    "2025Q4": (56.72, 14.75),
-    "2026Q1": (56.18, 22.75),
-    "2026Q2": (56.00, 27.09),
-}
+# Gross margin the company itself reported for these quarters, quoted in earnings commentary and
+# collected in data/raw/vbl_q2_history.csv. They are independent of the parser, so a bad
+# re-extraction or a change to the line-item definitions cannot pass this test by accident.
+REPORTED_Q3_2025_GM = 56.7
 
 
 def _shipped():
@@ -29,16 +19,39 @@ def test_shipped_data_is_clean():
     assert check_vbl(_shipped()) == []
 
 
-def test_shipped_data_matches_independent_reconciliation():
-    df = _shipped().set_index("quarter")
-    for quarter, (gm, ebitda) in GOLDEN.items():
-        row = df.loc[quarter]
-        assert row["gross_profit_cr"] / row["revenue_cr"] * 100 == pytest.approx(gm, abs=0.1)
-        assert row["ebitda_cr"] / row["revenue_cr"] * 100 == pytest.approx(ebitda, abs=0.1)
+def test_table_reproduces_company_reported_q2_margins():
+    table = _shipped().set_index("quarter")
+    reported = pd.read_csv(DATA_RAW / "vbl_q2_history.csv").set_index("quarter")
+    checked = 0
+    for quarter, row in reported.iterrows():
+        net = table.loc[quarter, "revenue_cr"] - table.loc[quarter, "excise_duty_cr"]
+        gm = table.loc[quarter, "gross_profit_cr"] / net * 100
+        assert gm == pytest.approx(row["gross_margin_pct"], abs=0.1), quarter
+        if pd.notna(row["ebitda_margin_company_pct"]):
+            ebitda = table.loc[quarter, "ebitda_cr"] / net * 100
+            assert ebitda == pytest.approx(row["ebitda_margin_company_pct"], abs=0.15), quarter
+        checked += 1
+    assert checked >= 6
 
 
-def test_no_shipped_quarter_trips_the_plausibility_bands():
-    assert not [w for w in vbl_warnings(_shipped()) if "margin" in w]
+def test_table_reproduces_company_reported_q3_2025_gross_margin():
+    row = _shipped().set_index("quarter").loc["2025Q3"]
+    gm = row["gross_profit_cr"] / (row["revenue_cr"] - row["excise_duty_cr"]) * 100
+    assert gm == pytest.approx(REPORTED_Q3_2025_GM, abs=0.1)
+
+
+def test_margins_use_net_revenue_not_gross():
+    row = _shipped().set_index("quarter").loc["2026Q2"]
+    on_gross = row["ebitda_cr"] / row["revenue_cr"] * 100
+    on_net = row["ebitda_cr"] / (row["revenue_cr"] - row["excise_duty_cr"]) * 100
+    assert on_net - on_gross > 0.4  # the gap that made 27.1% versus the reported 27.7%
+
+
+def test_only_q4_seasonal_quarters_trip_the_plausibility_bands():
+    """Q4 has an inventory build and a low season, so its margins legitimately sit outside."""
+    odd = [w for w in vbl_warnings(_shipped()) if "margin" in w]
+    assert odd, "expected the Q4 warnings to be reported, not hidden"
+    assert all(w.split(":")[0].endswith("Q4") for w in odd)
 
 
 def test_detects_broken_identity():

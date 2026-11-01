@@ -8,13 +8,22 @@ from pathlib import Path
 
 import pandas as pd
 
+from .accounting import net_revenue
 from .config import DATA_RAW
 from .exceptions import DataValidationError
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
 
-REQUIRED = ["quarter", "revenue_cr", "gross_profit_cr", "opex_cr", "ebitda_cr", "source"]
+REQUIRED = [
+    "quarter",
+    "revenue_cr",
+    "excise_duty_cr",
+    "gross_profit_cr",
+    "opex_cr",
+    "ebitda_cr",
+    "source",
+]
 GM_MIN = 40.0
 GM_MAX = 70.0
 # Plausibility bands from VBL's reported history. Outside them is a warning, not an error.
@@ -47,6 +56,8 @@ def check_vbl(df: pd.DataFrame, tol_cr: float = 3.0) -> list[str]:
     for col in ["revenue_cr", "gross_profit_cr", "opex_cr", "ebitda_cr"]:
         if (df[col] <= 0).any():
             problems.append(f"non-positive values in {col}")
+    if (df["excise_duty_cr"] < 0).any() or (df["excise_duty_cr"] >= df["revenue_cr"]).any():
+        problems.append("excise_duty_cr must be between 0 and revenue_cr")
 
     gap = (df["gross_profit_cr"] - df["opex_cr"] - df["ebitda_cr"]).abs()
     for q in df.loc[gap > tol_cr, "quarter"]:
@@ -54,7 +65,7 @@ def check_vbl(df: pd.DataFrame, tol_cr: float = 3.0) -> list[str]:
             f"{q}: gross profit minus opex differs from EBITDA by more than {tol_cr} crore"
         )
 
-    gm = df["gross_profit_cr"] / df["revenue_cr"] * 100
+    gm = df["gross_profit_cr"] / net_revenue(df) * 100
     for q in df.loc[(gm < GM_MIN) | (gm > GM_MAX), "quarter"]:
         problems.append(f"{q}: gross margin outside {GM_MIN:.0f} to {GM_MAX:.0f} percent")
 
@@ -89,8 +100,9 @@ def vbl_warnings(df: pd.DataFrame) -> list[str]:
                 "safe, but fewer rows are usable"
             )
 
-    gm = df["gross_profit_cr"] / df["revenue_cr"] * 100
-    margin = df["ebitda_cr"] / df["revenue_cr"] * 100
+    net = net_revenue(df)
+    gm = df["gross_profit_cr"] / net * 100
+    margin = df["ebitda_cr"] / net * 100
     for q, value in zip(df["quarter"], gm, strict=True):
         if not GM_WARN[0] <= value <= GM_WARN[1]:
             warnings.append(

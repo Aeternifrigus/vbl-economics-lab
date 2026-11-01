@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 
+from .accounting import net_revenue
 from .config import LAG_FEATURES
 from .logging_config import get_logger
 
@@ -83,12 +84,18 @@ def build_table(
         len(weather_q),
     )
 
-    t = vbl.set_index("period")[
-        ["revenue_cr", "gross_profit_cr", "opex_cr", "ebitda_cr", "volume_growth_yoy_pct"]
-    ].copy()
-    t["gm_pct"] = t["gross_profit_cr"] / t["revenue_cr"] * 100
-    t["opex_ratio_pct"] = t["opex_cr"] / t["revenue_cr"] * 100
-    t["opm_pct"] = (t["gross_profit_cr"] - t["opex_cr"]) / t["revenue_cr"] * 100
+    cols = ["revenue_cr", "gross_profit_cr", "opex_cr", "ebitda_cr", "volume_growth_yoy_pct"]
+    if "excise_duty_cr" in vbl.columns:
+        cols.insert(1, "excise_duty_cr")
+    t = vbl.set_index("period")[cols].copy()
+    t["net_revenue_cr"] = net_revenue(t)
+    # Margins use net revenue (revenue less excise), the base VBL uses for its reported margins.
+    t["gm_pct"] = t["gross_profit_cr"] / t["net_revenue_cr"] * 100
+    t["opex_ratio_pct"] = t["opex_cr"] / t["net_revenue_cr"] * 100
+    t["opm_pct"] = (t["gross_profit_cr"] - t["opex_cr"]) / t["net_revenue_cr"] * 100
+
+    for quarter in (2, 3, 4):
+        t[f"q{quarter}"] = (t.index.quarter == quarter).astype(float)
 
     # Oil is lagged on the full quarterly index so lags reach before the first company quarter.
     oil_l = add_lags(oil_q, ["brent_inr"], n_lags)

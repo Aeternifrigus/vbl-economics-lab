@@ -48,12 +48,15 @@ def vbl_table(brent, fx, n_quarters=None, seed=11):
     gm = 56 + TRUE_LAG1_COEF * (lag1 - lag1.mean()) + rng.normal(0, 0.25, len(periods))
     season = np.array([0.85, 1.25, 0.95, 0.75])[periods.quarter - 1]
     revenue = (4000 + 60 * np.arange(len(periods))) * season
-    opex = 700 + 0.12 * revenue
-    gross = gm.to_numpy() / 100 * revenue
+    excise = 0.02 * revenue
+    net = revenue - excise
+    opex = 700 + 0.12 * net
+    gross = gm.to_numpy() / 100 * net
     return pd.DataFrame(
         {
             "quarter": [str(p) for p in periods],
             "revenue_cr": revenue.round(1),
+            "excise_duty_cr": excise.round(1),
             "gross_profit_cr": gross.round(1),
             "opex_cr": opex.round(1),
             "ebitda_cr": (gross - opex).round(1),

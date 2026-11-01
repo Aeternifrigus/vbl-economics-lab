@@ -49,6 +49,7 @@ def test_line_items_are_mapped_to_the_documented_definitions():
     # gross = 39,525.91 - 19,113.32 = 20,412.59 ; opex = 3,391.22 + 9,040.99 = 12,432.21
     q1 = {r.quarter: r for r in _rows()}["2023Q1"]
     assert q1.revenue_cr == pytest.approx(3952.6, abs=0.05)
+    assert q1.excise_duty_cr == pytest.approx(59.62, abs=0.05)
     assert q1.gross_profit_cr == pytest.approx(2041.26, abs=0.05)
     assert q1.opex_cr == pytest.approx(1243.22, abs=0.05)
     assert q1.ebitda_cr == pytest.approx(798.04, abs=0.1)
@@ -103,3 +104,47 @@ def test_missing_pdf_dependency_message(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", fake_import)
     with pytest.raises(ConfigurationError):
         read_pdf_pages(Path("x.pdf"))
+
+
+def test_ocr_damaged_numbers_are_normalised_by_shape():
+    # Real examples from the filings' text layer: periods or commas where thousands separators go.
+    assert parse_numbers("Total income 24.773.68 25.074.52") == [24773.68, 25074.52]
+    assert parse_numbers("Revenue 17,768,57 2.296.48 9.967.60") == [17768.57, 2296.48, 9967.60]
+    assert parse_numbers("Changes (331.67) 1.128.75") == [-331.67, 1128.75]
+
+
+def test_unicode_dashes_count_as_nil_not_as_missing_columns():
+    assert parse_numbers("Exceptional items \u2013 \u2014 -") == [0.0, 0.0, 0.0]
+    assert parse_numbers("Exceptional items - 665.29") == [0.0, 665.29]
+
+
+def test_header_typos_do_not_hide_the_statement():
+    text = FIXTURE.read_text().replace(
+        "consolidated financial results", "consoiidated financial results", 1
+    )
+    rows = extract_from_pages(split_pages(text), "typo.pdf")
+    assert [r.quarter for r in rows] == ["2023Q1", "2022Q4", "2022Q1"]
+
+
+def test_a_misread_amount_is_rejected_by_the_tie_out_not_merged():
+    # Corrupt one expense amount in the first column: that column must be dropped, the others kept.
+    text = FIXTURE.read_text().replace("19,643.11", "19,043.11", 1)
+    rows = extract_from_pages(split_pages(text), "corrupt.pdf")
+    assert "2023Q1" not in [r.quarter for r in rows]
+    assert {"2022Q4", "2022Q1"} <= {r.quarter for r in rows}
+
+
+def test_tie_out_also_protects_the_revenue_line():
+    text = FIXTURE.read_text().replace("39,525.91", "39,825.91", 1)
+    rows = extract_from_pages(split_pages(text), "corrupt.pdf")
+    assert "2023Q1" not in [r.quarter for r in rows]
+
+
+def test_overwrite_carries_hand_entered_volume_fields():
+    new = merge_rows(_rows())
+    existing = new.iloc[[2]].copy()
+    existing["volume_growth_yoy_pct"] = 16.3
+    existing["volume_note"] = "consolidated"
+    out = merge_into_table(existing, new, overwrite=True)
+    row = out[out["quarter"] == "2023Q1"].iloc[0]
+    assert row["volume_growth_yoy_pct"] == 16.3 and row["volume_note"] == "consolidated"

@@ -1,12 +1,20 @@
-# Model card: operating leverage (v2026Q2)
+# Model cards (v2026Q3)
 
-- Purpose: describe how much of VBL's quarterly EBITDA margin swing comes from fixed cost spread over volume.
-- Model: opex = fixed + variable x revenue, fit by ordinary least squares, with t-based 90% intervals and leave-one-out error.
-- Data: nine consolidated quarters (2022Q1, 2022Q4, 2023Q1, 2025Q1 to 2026Q2) from `data/raw/vbl_quarterly.csv`. The hash is recorded in `models/leverage_2026Q2.json`.
-- Results: R squared 0.89, fixed cost about 400 crore a quarter (90% interval 51 to 748), variable cost about 25% of revenue (90% interval 19% to 31%), leave-one-out error about 5 points of EBITDA margin.
-- Margin attribution: the opex ratio spans 14.4 points and gross margin 7.2 points across these quarters.
-- Intended use: explaining margin seasonality and sanity-checking the narrative in the original reports.
-- Not for: forecasting, investment decisions, or conclusions about packaged water specifically.
-- Main risks: nine observations with a gap from 2023Q2 to 2024Q4, pooled across years with different cost scales, consolidated multi-product numbers, and a mix of two source types (a filings statement and an aggregator).
+## Gross margin model: Brent lags and seasonality
 
-The distributed-lag gross margin model has no release. It refuses to train below 20 usable quarters. See the README status table.
+- Purpose: estimate how much of VBL's quarterly gross margin moves with the price of Brent, and test the original report's claim that it moves a lot.
+- Model: ridge regression of gross margin (percent of net revenue) on Brent in INR at lags 0 to 3 quarters plus quarter-of-year dummies. The ridge penalty is chosen by time-series cross-validation. Weather features were tested and left out because they worsened the backtest.
+- Data: 38 consolidated quarters, 2016Q4 to 2026Q3, from `data/raw/vbl_quarterly.csv`, with FRED Brent and USD/INR snapshots. Hashes are recorded in `models/lagged_gm_2026Q3.json`.
+- Result: about -0.43 gross margin points per 10 USD per barrel of Brent held for a year (90% moving-block bootstrap interval -0.66 to -0.25).
+- Evaluation: one-quarter-ahead rolling backtest over 26 quarters. MAE 1.54 points against 1.90 for seasonal-naive and 1.76 for seasonality alone. In the latest quarter (2026Q3, gross margin 53.1%) it predicted 54.4 against 56.7 for seasonal-naive.
+- Intended use: sizing the oil sensitivity of VBL's gross margin and checking claims about it.
+- Not for: investment decisions, or conclusions about packaged water specifically (it is a soft-drink-led bottler).
+- Main risks: 38 observations, collinear oil lags, a feature set chosen on the same backtest, and a Q4 inventory effect that the quarter dummies only partly absorb.
+
+## Operating leverage model
+
+- Purpose: describe how much of the quarterly EBITDA margin swing comes from fixed cost spread over volume.
+- Model: opex = fixed + variable x net revenue, ordinary least squares with t-based 90% intervals and leave-one-out error.
+- Data: the same 38 quarters.
+- Result: R squared 0.93, fixed cost about 205 crore a quarter (130 to 281), variable cost about 26% of net revenue (24% to 28%), leave-one-out error about 6.5 points of EBITDA margin.
+- Main risks: revenue grew about 15-fold over the period, so one linear cost line is a rough description. Consolidated multi-product numbers. A gap at 2017Q1 and 2017Q2.

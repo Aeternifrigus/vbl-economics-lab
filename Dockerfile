@@ -1,15 +1,19 @@
-# Runtime image for packaged-water-lab (CLI only).
+# Runtime image for vbl-economics-lab (CLI only).
 FROM python:3.12-slim
 
 RUN useradd --create-home --shell /bin/bash appuser
 WORKDIR /app
 
-# Install the package from source (non-editable) so the image has no dependency on the build dir.
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
-RUN pip install --no-cache-dir .
+# Dependencies first, from the hash-pinned lock, so this layer is cached until the lock changes.
+COPY requirements.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
-# Data and outputs are mounted or copied in; ship the reconciled raw data and claims.
+# Then the package itself, without re-resolving dependencies.
+COPY pyproject.toml README.md LICENSE ./
+COPY src/ ./src/
+RUN pip install --no-cache-dir --no-deps .
+
+# The reconciled raw data and claims ship in the image. Snapshots, models and reports are mounted.
 COPY data/raw/ ./data/raw/
 COPY claims/ ./claims/
 RUN mkdir -p data/external models reports && chown -R appuser:appuser /app

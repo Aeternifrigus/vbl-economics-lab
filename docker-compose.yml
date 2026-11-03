@@ -1,38 +1,16 @@
+# One service: run any pwl command in the pinned image.
+#   docker compose run --rm pwl validate
+#   docker compose run --rm pwl nowcast
+# Create a .env file with FRED_API_KEY=... first (see .env.example).
 services:
   pwl:
     build: .
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - FRED_API_KEY=${FRED_API_KEY}
-      - LOG_LEVEL=INFO
-      - LOG_FORMAT=console
+      LOG_FORMAT: console
     volumes:
       - ./data:/app/data
       - ./models:/app/models
       - ./reports:/app/reports
-    command: ["--help"]
-
-  pwl-dev:
-    build: .
-    environment:
-      - FRED_API_KEY=${FRED_API_KEY}
-      - LOG_LEVEL=DEBUG
-      - LOG_FORMAT=console
-    volumes:
-      - ./src:/app/src
-      - ./data:/app/data
-      - ./models:/app/models
-      - ./reports:/app/reports
-      - ./tests:/app/tests
-      - ./claims:/app/claims
-    command: ["bash"]
-    stdin_open: true
-    tty: true
-
-  test:
-    build: .
-    environment:
-      - LOG_LEVEL=DEBUG
-    volumes:
-      - ./src:/app/src
-      - ./tests:/app/tests
-    command: ["python", "-m", "pytest", "-q", "--cov=src/pwl"]

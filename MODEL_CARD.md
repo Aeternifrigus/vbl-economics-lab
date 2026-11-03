@@ -1,5 +1,7 @@
 # Model cards (v2026Q3)
 
+Project: vbl-economics-lab. Both models describe VBL, a soft-drink-led bottler, not the packaged water category.
+
 ## Gross margin model: Brent lags and seasonality
 
 - Purpose: estimate how much of VBL's quarterly gross margin moves with the price of Brent, and test the original report's claim that it moves a lot.
@@ -9,7 +11,10 @@
 - Evaluation: one-quarter-ahead rolling backtest over 26 quarters. MAE 1.54 points against 1.90 for seasonal-naive and 1.76 for seasonality alone. In the latest quarter (2026Q3, gross margin 53.1%) it predicted 54.4 against 56.7 for seasonal-naive.
 - Intended use: sizing the oil sensitivity of VBL's gross margin and checking claims about it.
 - Not for: investment decisions, or conclusions about packaged water specifically (it is a soft-drink-led bottler).
-- Main risks: 38 observations, collinear oil lags, a feature set chosen on the same backtest, and a Q4 inventory effect that the quarter dummies only partly absorb.
+- Nowcasts: `pwl nowcast` applies the model to the current quarter using Brent to date. The 90% interval is the 5th to 95th percentile of backtest errors (about 26 quarters), so it is empirical. The output flags `extrapolating` when oil is outside the training range, and the metadata stores that range. Nowcasting a quarter that is already in the training data is in-sample.
+- Monitoring: `pwl monitor` checks the PSI of recent Brent against earlier history, the share of recent days outside the historical range, and whether the latest backtest errors are unusually large. At the time of writing Brent is far outside the earlier range, so the input-drift check warns, and nowcasts for the current quarter are extrapolations.
+- Release: `pwl release` bundles the model, metadata, training data, backtest and this card with a SHA-256 manifest, and refuses a model trained on different data than the current snapshot.
+- Main risks: 38 observations, collinear oil lags, a feature set chosen on the same backtest, a linear model that extrapolates poorly when oil is far outside its range, and a Q4 inventory effect that the quarter dummies only partly absorb.
 
 ## Operating leverage model
 

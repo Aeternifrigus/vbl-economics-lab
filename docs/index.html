@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Does oil really drive Varun Beverages' margins? | vbl-economics-lab</title>
+<meta name="author" content="Aeternifrigus">
+<meta name="description" content="An industry report claimed oil crushes Varun Beverages' margins. A machine learning pipeline tested it against 38 quarters of filings: oil matters, but at least 15 times less than claimed.">
+<meta property="og:title" content="Does oil really drive Varun Beverages' margins?">
+<meta property="og:description" content="Testing an industry report's claims against 38 quarters of company filings with a reproducible ML pipeline.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%89%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #fafaf9; --fg: #1c1917; --muted: #57534e; --card: #ffffff; --line: #e7e5e4;
+  --grid: #e7e5e4; --blue: #2563eb; --orange: #ea580c; --gray: #78716c; --green: #15803d;
+  --red: #b91c1c; --soft-blue: #dbeafe; --soft-orange: #ffedd5; --soft-green: #dcfce7;
+  --soft-gray: #f5f5f4; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0a09; --fg: #f5f5f4; --muted: #a8a29e; --card: #1c1917; --line: #292524;
+    --grid: #292524; --blue: #60a5fa; --orange: #fb923c; --gray: #a8a29e; --green: #4ade80;
+    --red: #f87171; --soft-blue: #172554; --soft-orange: #431407; --soft-green: #052e16;
+    --soft-gray: #1c1917; --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); line-height: 1.6;
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+a { color: var(--blue); }
+h1, h2, h3 { line-height: 1.2; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); margin: 0 0 .6rem; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2rem); margin: 0 0 .5rem; }
+h3 { font-size: 1.15rem; margin: 0 0 .35rem; }
+p { margin: 0 0 1rem; }
+.muted { color: var(--muted); }
+nav { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+nav .wrap { display: flex; gap: 18px; align-items: center; height: 52px; overflow-x: auto; white-space: nowrap; }
+nav strong { margin-right: auto; }
+nav a { text-decoration: none; color: var(--muted); font-size: .92rem; }
+nav a:hover { color: var(--fg); }
+header.hero { padding: 64px 0 40px; }
+.byline { margin: -.2rem 0 1.1rem; font-size: 1rem; color: var(--muted); }
+.byline a { color: var(--fg); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--orange); }
+.byline a:hover { color: var(--orange); }
+nav .wrap { max-width: 1100px; }
+@media (max-width: 1000px) { nav .by { display: none; } }
+nav .by { font-weight: 400; color: var(--muted); font-size: .85rem; margin-left: 8px; text-decoration: none; }
+nav .by b { color: var(--fg); }
+nav .by:hover b { color: var(--orange); }
+.eyebrow { text-transform: uppercase; letter-spacing: .1em; font-size: .78rem; color: var(--orange); font-weight: 700; }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 720px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin: 28px 0 8px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+.stat b { display: block; font-size: 2.1rem; line-height: 1.1; letter-spacing: -0.02em; }
+.stat span { color: var(--muted); font-size: .9rem; }
+section { padding: 44px 0; border-top: 1px solid var(--line); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); margin: 18px 0; }
+.chart { width: 100%; min-height: 240px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+figcaption, .caption { color: var(--muted); font-size: .92rem; margin-top: 10px; }
+.takeaway { border-left: 4px solid var(--blue); background: var(--soft-blue); padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 16px 0; }
+.warn { border-left-color: var(--orange); background: var(--soft-orange); }
+.good { border-left-color: var(--green); background: var(--soft-green); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.hyp { display: flex; flex-direction: column; gap: 6px; }
+.hyp .num { font-weight: 800; color: var(--orange); }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.pill.bad { background: var(--soft-orange); color: var(--orange); }
+.pill.ok { background: var(--soft-green); color: var(--green); }
+.pill.mid { background: var(--soft-blue); color: var(--blue); }
+.pill.unk { background: var(--soft-gray); color: var(--muted); border: 1px solid var(--line); }
+ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 12px; }
+ol.steps li { counter-increment: s; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 16px 58px; position: relative; box-shadow: var(--shadow); }
+ol.steps li::before { content: counter(s); position: absolute; left: 16px; top: 14px; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: .9rem; }
+ol.steps b { display: block; margin-bottom: 2px; }
+.flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; font-size: .9rem; }
+.flow span { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.flow i { color: var(--muted); font-style: normal; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+details { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px 16px; box-shadow: var(--shadow); }
+summary { cursor: pointer; padding: 12px 0; font-weight: 700; }
+.tablewrap { overflow-x: auto; }
+footer { padding: 40px 0 70px; color: var(--muted); font-size: .9rem; border-top: 1px solid var(--line); }
+code { background: var(--soft-gray); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; font-size: .88em; }
+/* svg */
+svg text { fill: var(--muted); font-size: 12px; font-family: inherit; }
+svg .grid { stroke: var(--grid); stroke-width: 1; }
+svg .axis { stroke: var(--muted); stroke-width: 1; }
+svg .lbl { fill: var(--fg); font-size: 12.5px; font-weight: 600; }
+svg .axl { fill: var(--muted); font-size: 12.5px; }
+svg .strong { fill: var(--fg); font-weight: 700; }
+svg .blue { fill: var(--blue); } svg .orange { fill: var(--orange); } svg .grayf { fill: var(--gray); }
+svg text.blue, svg text.orange { font-weight: 700; }
+ol.timeline { list-style: none; margin: 26px 0 0; padding: 0 0 0 28px; border-left: 2px solid var(--line); display: grid; gap: 26px; }
+ol.timeline li { position: relative; }
+ol.timeline li::before { content: ""; position: absolute; left: -37px; top: 6px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--bg); border: 3px solid var(--blue); }
+ol.timeline li.turn::before { border-color: var(--orange); }
+.tag { display: inline-block; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--blue); margin-bottom: 2px; }
+li.turn .tag { color: var(--orange); }
+ol.timeline h3 { margin: 0 0 6px; font-size: 1.25rem; }
+ol.timeline p { margin: 0 0 .7rem; max-width: 720px; }
+.lessons { display: grid; gap: 10px; margin: 8px 0 0; padding: 0; list-style: none; }
+.lessons li { padding-left: 26px; position: relative; }
+.lessons li::before { content: "\2713"; position: absolute; left: 0; color: var(--green); font-weight: 800; }
+@media (max-width: 560px) { header.hero { padding-top: 40px; } nav a.hide-sm { display: none; } }
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <strong>vbl-economics-lab<a class="by hide-sm" href="https://aeternifrigus.netlify.app" target="_blank" rel="noopener noreferrer">by <b>Aeternifrigus</b> &#8599;</a></strong>
+  <a href="#story">The story</a><a href="#claim">The claim</a><a href="#oil">Oil</a><a href="#ml" class="hide-sm">How the ML works</a>
+  <a href="#seasonal" class="hide-sm">Seasonality</a><a href="#live">Live status</a><a href="#claims">All claims</a>
+  <a id="repo-link" href="#">GitHub</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">An industry report meets the filings</div>
+  <h1>Does oil really drive Varun Beverages' margins?</h1>
+  <p class="byline">By <a href="https://aeternifrigus.netlify.app" target="_blank" rel="noopener noreferrer">Aeternifrigus</a> &#8599;</p>
+  <p class="lede">A report on Indian packaged water said yes, dramatically. I tested its claims against <span id="n-quarters">38</span> quarters of company filings, oil prices and weather with a reproducible machine learning pipeline. Oil matters, but far less than claimed.</p>
+  <div class="stats" id="stats"></div>
+  <noscript><p class="takeaway warn">The charts on this page need JavaScript. The numbers and the code are in the repository.</p></noscript>
+</div></header>
+
+<main class="wrap">
+
+<section id="story">
+  <h2>How this started</h2>
+  <p class="muted">From a 20 rupee bottle of water to a model that is allowed to say no.</p>
+  <ol class="timeline">
+    <li><span class="tag">The question</span><h3>A bottle that sells for &#8377;20 and costs about &#8377;3 to make</h3>
+      <p>It began as a simple question: how does a bottle of water that sells for &#8377;20, and that one report put at &#8377;3 to &#8377;4 at the factory gate, turn into a business? I wrote three reports to find out. They covered the unit economics (a plastic preform at roughly &#8377;1.50 to &#8377;1.80), the retail cascade (the shopkeeper keeps 40 to 50 percent), the 100 km limit that keeps water local because it is heavy and cheap, and the 20 litre jar that quietly subsidises the bottle.</p></li>
+    <li class="turn"><span class="tag">The reports</span><h3>Reports that sounded sure</h3>
+      <p>The reports were confident. They used words like "proof" and "near perfect correlation": a 42 percent summer surge, r = 0.89 between heat and sales, and a gross margin that drops to 38 percent once oil passes $90. Confident writing is not evidence, though. The statistical evidence was a four-row table and a regression chart that existed only as a caption.</p>
+      <p>So the reports became hypotheses. Every claim went into a table next to the number it implied, ready to be checked.</p></li>
+    <li><span class="tag">The data</span><h3>Finding data that could say no</h3>
+      <p>Packaged water is not reported on its own. The closest public numbers belong to Varun Beverages, PepsiCo's bottler in India, and it sells mostly soft drinks: water was 16 to 22 percent of its volume in the quarters I checked. That turned the project from "the packaged water industry" into "Varun Beverages", and it is why this page is careful about what it claims. Quarterly results came from company filings, oil and exchange rates from FRED, weather from Open-Meteo.</p></li>
+    <li class="turn"><span class="tag">The mistake</span><h3>The first answer looked fine and was wrong</h3>
+      <p>A first pass pulled 30 quarters out of the results PDFs and trained a model. The outputs were strange: a negative fixed cost, and a model that lost to a simple baseline. They were symptoms, not findings. Checking six quarters against the published figures showed EBITDA margins of about 5 percent where the company reported 22 to 28. The extractor had read the wrong lines of the statement.</p></li>
+    <li><span class="tag">The fix</span><h3>Making the data hard to get wrong</h3>
+      <p>The table was rebuilt from the original PDFs. Their text layer turned out to be damaged (decimal points came out as commas), so every number is read by its shape, and every column has to add up to the filing's own totals or it is thrown out. Five of the PDFs were scans that nothing could read, so two quarters were entered by hand from page images and checked the same way.</p>
+      <p>The test that mattered: the finished table reproduces the gross margins the company itself reported for six second quarters, to within 0.04 points.</p></li>
+    <li><span class="tag">The model</span><h3>A fair fight</h3>
+      <p>With trustworthy data the model could finally be tested. The first version tied a simple baseline, and the reason was that it knew nothing about seasons: gross margin has a strong yearly pattern, and the baseline got it for free. Once the model had quarter-of-year terms I switched feature groups on and off. Oil cut the error by 12 percent beyond seasonality. Weather made it worse.</p>
+      <p>The oil effect is 0.43 points of gross margin per $10 of Brent, against at least 7 implied by the report.</p></li>
+    <li><span class="tag">The system</span><h3>From analysis to something that is operated</h3>
+      <p>A result nobody can reproduce is an anecdote. So the project got hash-pinned installs, tests that run the whole pipeline on synthetic data with a planted signal, a monthly job that refreshes the data and runs drift checks, a nowcast for the current quarter, and releases that refuse a stale model. The nowcast now carries a warning: Brent has moved above anything the model was trained on, so it says so instead of giving a confident number.</p></li>
+    <li><span class="tag">Still open</span><h3>What this does not settle</h3>
+      <p>Whether heat really drives volume is untested, because the filings do not include organic volume. The sample is 38 quarters from one company. And the oil effect is evidence about size, not proof of cause. The next step is to get volume by quarter from investor presentations and test heat properly.</p></li>
+  </ol>
+  <div class="card" style="margin-top:30px">
+    <h3>Three habits worth keeping</h3>
+    <ul class="lessons">
+      <li><b>Treat a confident report as a hypothesis.</b> Write each claim down with the number it implies, then try to break it.</li>
+      <li><b>Check your data against numbers the company published</b> before trusting any model built on it. The model's first strange outputs were data errors.</li>
+      <li><b>Let the model be unimpressive when that is the truth.</b> The finding is "much smaller than claimed", not "confirmed".</li>
+    </ul>
+  </div>
+</section>
+
+<section id="claim">
+  <h2>The claim</h2>
+  <p class="muted">Three reports about the Indian packaged water industry made specific, testable statements. Each one became a hypothesis to check against real data. Varun Beverages (VBL), the PepsiCo bottler, is the best public data source for it, though it sells mostly soft drinks.</p>
+  <div class="grid2">
+    <div class="card hyp"><span class="num">Hypothesis 1</span><h3>Heat drives sales</h3>
+      <p>Summer heatwaves lift Q2 volume by about 42% and correlate with it at r = 0.89.</p><span id="pill-h1"></span></div>
+    <div class="card hyp"><span class="num">Hypothesis 2</span><h3>Oil crushes margins</h3>
+      <p>When Brent is above $90, gross margin falls toward 38%. Below $70 it sits above 52%.</p><span id="pill-h2"></span></div>
+    <div class="card hyp"><span class="num">Hypothesis 3</span><h3>Margins swing with input costs</h3>
+      <p>EBITDA margin is 21.8% in Q2 but only 13.5% in Q3 and 14.2% in Q1, because of costs.</p><span id="pill-h3"></span></div>
+  </div>
+  <p class="caption">Verdicts come from <code>claims/claims.csv</code>. Hypothesis 1 can only be partly checked: the filings do not include organic volume, so it stays open.</p>
+</section>
+
+<section id="oil">
+  <h2>Test 1: does margin collapse when oil is expensive?</h2>
+  <p>Each dot is one quarter of VBL's filings: the average price of Brent crude against that quarter's gross margin. If the report were right, the dots on the right would fall toward 38%.</p>
+  <figure class="card" style="margin-left:0;margin-right:0">
+    <div id="chart-scatter" class="chart" role="img" aria-label="Scatter of Brent price against gross margin for 38 quarters, with the report's claimed 38 percent margin at high oil far below the actual data"></div>
+    <figcaption>Orange box: where the report says margin should land when Brent is above $90. Diamonds are Q4 quarters, which run higher because of inventory build-up. Hover a dot for the quarter.</figcaption>
+  </figure>
+  <div class="takeaway warn" id="oil-takeaway"></div>
+</section>
+
+<section id="ml">
+  <h2>How the machine learning tests it</h2>
+  <p>A scatter plot cannot separate oil from the seasons. Gross margin is higher in some quarters for reasons that have nothing to do with oil. So I let a model try to predict margin <em>before</em> it happens, and measured whether knowing the oil price helps.</p>
+  <ol class="steps">
+    <li><b>Turn filings into clean numbers.</b>VBL's results PDFs are parsed into 38 quarters. Every column must add up to the filing's own totals, or it is rejected, and the margins match what the company itself reported.</li>
+    <li><b>Give the model only what is known in advance.</b>Brent in rupees over the last four quarters, plus which quarter of the year it is. Nothing from the future.</li>
+    <li><b>Keep the model simple on purpose.</b>A regularised linear model (ridge). With 38 quarters a complex model would just memorise noise, and a linear one shows directly how many margin points move per unit of oil.</li>
+    <li><b>Backtest as if it were the past again.</b>For each of the last 26 quarters, train only on earlier quarters, predict that quarter, then compare with what really happened and with a naive guess (the same quarter last year).</li>
+    <li><b>Switch features off one group at a time.</b>If oil truly matters, removing it should make predictions worse. That ablation is the actual test of the hypothesis.</li>
+    <li><b>Put an honest error bar on the answer.</b>A block bootstrap resamples runs of consecutive quarters to see how much the estimate would wobble.</li>
+    <li><b>Keep watching.</b>A monthly job refreshes the data, flags when oil leaves the range the model has seen, and warns when errors grow.</li>
+  </ol>
+
+  <h3 style="margin-top:30px">Result A: does knowing the oil price improve predictions?</h3>
+  <figure class="card" style="margin-left:0;margin-right:0">
+    <div id="chart-ablation" class="chart" role="img" aria-label="Bar chart of average prediction error for five approaches; the seasonal plus oil model has the lowest error"></div>
+    <figcaption>Average error predicting one quarter ahead over the last 26 quarters. Shorter is better.</figcaption>
+  </figure>
+  <div class="takeaway good" id="ablation-takeaway"></div>
+
+  <h3 style="margin-top:30px">Result B: how big is the effect?</h3>
+  <figure class="card" style="margin-left:0;margin-right:0">
+    <div id="chart-effect" class="chart" role="img" aria-label="Bar chart comparing the report's implied oil effect with the model's estimate"></div>
+    <figcaption>Gross margin points lost when Brent rises $10 and stays there. The whisker is the 90% interval. The report's 7.0 is a minimum implied by its own two anchor numbers (52% to 38% across $70 to $90).</figcaption>
+  </figure>
+  <div class="takeaway" id="effect-takeaway"></div>
+
+  <h3 style="margin-top:30px">Prediction against reality</h3>
+  <figure class="card" style="margin-left:0;margin-right:0">
+    <div id="chart-backtest" class="chart" role="img" aria-label="Line chart of actual gross margin against model predictions and a seasonal naive baseline over 26 quarters"></div>
+    <figcaption>Each point is a prediction made using only earlier quarters. Neither line is precise: the model misses by about 1.5 points on average and the naive baseline by 1.9. The model is useful as a test because it is wrong by less, not because it is right.</figcaption>
+  </figure>
+
+  <div class="card">
+    <h3>What this does and does not show</h3>
+    <p><b>It shows</b> that the report's magnitude is not supported by 38 quarters of filings, and that oil has a small, consistent negative link to gross margin that holds up out of sample.</p>
+    <p style="margin-bottom:0"><b>It does not show</b> cause and effect. It is one company, mostly soft drinks. Weather and volume are untested here. The feature set was chosen while looking at this same backtest, so the improvement is slightly optimistic. And Brent is now above the range the model was trained on (see Live status). Treat this as strong evidence against the report's size, not a proof of the true size.</p>
+  </div>
+</section>
+
+<section id="seasonal">
+  <h2>Test 2: why do margins swing through the year?</h2>
+  <p>The report credited input costs. The filings point somewhere else: most costs are fixed, so when summer volume is high they are spread over more sales.</p>
+  <figure class="card" style="margin-left:0;margin-right:0">
+    <div id="chart-seasonal" class="chart" role="img" aria-label="Grouped bars of the report's EBITDA margin by quarter against the actual median with min to max range"></div>
+    <figcaption>EBITDA margin by quarter of the year. Orange: what the report said. Blue: the actual median across nine or ten years, with the best and worst year as the whisker.</figcaption>
+  </figure>
+  <figure class="card" style="margin-left:0;margin-right:0">
+    <div id="chart-costs" class="chart" role="img" aria-label="Paired bars for each year showing how much net sales and operating costs fall from Q2 to Q4"></div>
+    <figcaption>Change from Q2 to Q4 within the same year. Sales (grey) fall by about half every year. Operating costs (blue) fall far less, and in 2020 and 2021 even rose or stayed flat.</figcaption>
+  </figure>
+  <div class="takeaway" id="seasonal-takeaway"></div>
+</section>
+
+<section id="live">
+  <h2>Live status</h2>
+  <p class="muted">Refreshed by the monthly job. This part shows the system being operated, not just analysed.</p>
+  <div class="grid2">
+    <div class="card" id="nowcast-card"></div>
+    <div class="card" id="monitor-card"></div>
+  </div>
+</section>
+
+<section id="system">
+  <h2>How it is built</h2>
+  <div class="flow">
+    <span>Results PDFs</span><i>&rarr;</i><span>Parser with tie-out checks</span><i>&rarr;</i>
+    <span>Feature table</span><i>&larr;</i><span>Oil, FX and weather APIs</span><i>&rarr;</i>
+    <span>Ridge model</span><i>&rarr;</i><span>Backtest &amp; ablation</span><i>&rarr;</i>
+    <span>Nowcast, drift monitor</span><i>&rarr;</i><span>Verified release</span>
+  </div>
+  <p>Hash-pinned installs, tests on every push (including a pipeline test on synthetic data with a planted signal), a monthly automated refresh, and releases that refuse a model trained on stale data. The README and runbook in the repository cover how to run it.</p>
+</section>
+
+<section id="claims">
+  <h2>Every claim, checked</h2>
+  <details>
+    <summary>Show all <span id="n-claims">15</span> claims with the evidence</summary>
+    <div class="tablewrap"><table id="claims-table"><thead>
+      <tr><th>#</th><th>The report said</th><th>The data says</th><th>Verdict</th></tr></thead><tbody></tbody></table></div>
+  </details>
+</section>
+
+</main>
+
+<footer><div class="wrap">
+  <p><b>Data.</b> VBL consolidated results (public filings on NSE and BSE), Brent crude and USD/INR from FRED (Federal Reserve Bank of St. Louis), weather from <a href="https://open-meteo.com/">Open-Meteo.com</a> (CC BY 4.0). VBL is a soft-drink-led bottler, so results describe VBL, not the packaged water category.</p>
+  <p>Charts are drawn from <code>docs/data.js</code>, which <code>pwl site</code> generates from the repository's own outputs. Generated <span id="generated">&nbsp;</span> from version <span id="version"></span>.
+  <a id="repo-link-2" href="#">Source on GitHub</a> &middot; MIT licence.</p>
+  <p>Built by <a href="https://aeternifrigus.netlify.app" target="_blank" rel="noopener noreferrer">Aeternifrigus</a>. More of my work at <a href="https://aeternifrigus.netlify.app" target="_blank" rel="noopener noreferrer">aeternifrigus.netlify.app</a>.</p>
+</div></footer>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.SITE_DATA;
+  if (!D) { document.querySelector("main").insertAdjacentHTML("afterbegin", "<p class='takeaway warn'>data.js did not load.</p>"); return; }
+  var NS = "http://www.w3.org/2000/svg";
+  var $ = function (id) { return document.getElementById(id); };
+  var f1 = function (v) { return (Math.round(v * 10 + 1e-9) / 10).toFixed(1); };
+  var f2 = function (v) { return (Math.round(v * 100 + 1e-9) / 100).toFixed(2); };
+
+  /* ---------- tiny SVG toolkit ---------- */
+  function el(tag, attrs, parent, text) {
+    var n = document.createElementNS(NS, tag);
+    for (var k in (attrs || {})) n.setAttribute(k, attrs[k]);
+    if (text !== undefined) n.textContent = text;
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function tip(node, text) { el("title", {}, node, text); return node; }
+  function lin(d, r) { var s = (r[1] - r[0]) / (d[1] - d[0]); return function (v) { return r[0] + (v - d[0]) * s; }; }
+  function niceTicks(min, max, n) {
+    var span = max - min, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), norm = raw / mag;
+    var step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag, out = [];
+    for (var v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) out.push(+v.toFixed(10));
+    return out;
+  }
+  function chart(id, o) {
+    var host = $(id); host.innerHTML = "";
+    var w = Math.max(280, host.clientWidth || 720), h = o.h ? o.h(w) : Math.max(250, Math.round(w * 0.56));
+    var m = o.m || { t: 14, r: 18, b: 50, l: 54 };
+    var svg = el("svg", { viewBox: "0 0 " + w + " " + h, "aria-hidden": "true" }, host);
+    var iw = w - m.l - m.r, ih = h - m.t - m.b;
+    var x = lin(o.xd, [m.l, m.l + iw]), y = lin(o.yd, [m.t + ih, m.t]);
+    var yt = o.yt || niceTicks(o.yd[0], o.yd[1], w < 520 ? 4 : 6), xt = o.xt || niceTicks(o.xd[0], o.xd[1], w < 520 ? 4 : 7);
+    yt.forEach(function (v) {
+      el("line", { x1: m.l, x2: m.l + iw, y1: y(v), y2: y(v), "class": "grid" }, svg);
+      el("text", { x: m.l - 8, y: y(v) + 4, "text-anchor": "end" }, svg, (o.yf || String)(v));
+    });
+    xt.forEach(function (v) { el("text", { x: x(v), y: m.t + ih + 18, "text-anchor": "middle" }, svg, (o.xf || String)(v)); });
+    el("line", { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, "class": "axis" }, svg);
+    if (o.xl) el("text", { x: m.l + iw / 2, y: h - 8, "text-anchor": "middle", "class": "axl" }, svg, o.xl);
+    if (o.yl) el("text", { transform: "translate(14," + (m.t + ih / 2) + ") rotate(-90)", "text-anchor": "middle", "class": "axl" }, svg, o.yl);
+    return { svg: svg, x: x, y: y, m: m, iw: iw, ih: ih, w: w, h: h };
+  }
+  function legend(c, items, x0, y0) {
+    var x = x0;
+    items.forEach(function (it) {
+      if (it.shape === "line") el("line", { x1: x, x2: x + 18, y1: y0 - 4, y2: y0 - 4, stroke: it.color, "stroke-width": it.width || 3, "stroke-dasharray": it.dash || "" }, c.svg);
+      else if (it.shape === "diamond") el("rect", { x: x + 3, y: y0 - 11, width: 9, height: 9, transform: "rotate(45 " + (x + 7.5) + " " + (y0 - 6.5) + ")", fill: it.color }, c.svg);
+      else el("circle", { cx: x + 7, cy: y0 - 5, r: 5, fill: it.color }, c.svg);
+      var t = el("text", { x: x + 22, y: y0, "class": "lbl" }, c.svg, it.label);
+      x += 28 + it.label.length * 6.6;
+    });
+  }
+
+  /* ---------- derived numbers ---------- */
+  var Q = D.quarters, R = D.report_claims, B = D.backtest, M = D.model;
+  var effect = M.effect_per_10usd ? Math.abs(M.effect_per_10usd.estimate) : null;
+  var ci = M.effect_per_10usd ? M.effect_per_10usd.ci90.map(Math.abs).sort(function (a, b) { return a - b; }) : null;
+  var ratio = effect ? R.implied_points_per_10usd / effect : null;
+  var abl = B.ablation, base = B.summary.mae_seasonal_naive;
+  var oilAbl = abl.seasonal_plus_oil, seasAbl = abl.seasonal_only;
+  var gapOil = seasAbl && oilAbl ? (1 - oilAbl.mae / seasAbl.mae) * 100 : null;
+  var hi = Q.filter(function (q) { return q.brent > R.oil_high_usd; });
+  var hiMin = hi.length ? Math.min.apply(null, hi.map(function (q) { return q.gm; })) : null;
+  var hiMax = hi.length ? Math.max.apply(null, hi.map(function (q) { return q.gm; })) : null;
+
+  /* ---------- text pieces ---------- */
+  $("repo-link").href = D.repo_url; $("repo-link-2").href = D.repo_url;
+  $("n-quarters").textContent = Q.length; $("n-claims").textContent = D.claims.length;
+  $("generated").textContent = D.generated_at.slice(0, 10); $("version").textContent = D.version;
+  function stat(big, small) { return "<div class='stat'><b>" + big + "</b><span>" + small + "</span></div>"; }
+  $("stats").innerHTML =
+    stat(ratio ? "&ge;" + Math.floor(ratio / 5) * 5 + "&times;" : "n/a", "smaller oil effect than the report claimed") +
+    stat(effect ? f2(effect) + " pts" : "n/a", "gross margin lost per +$10 Brent (90% interval " + (ci ? f2(ci[0]) + " to " + f2(ci[1]) : "n/a") + ")") +
+    stat(oilAbl ? Math.round(oilAbl.skill_vs_seasonal_naive * 100) + "%" : "n/a", "lower prediction error than a seasonal baseline") +
+    stat(Q.length, "quarters of filings, each tied out to the filing's own totals");
+
+  function verdictClass(v) {
+    v = v.toLowerCase();
+    if (v.indexOf("unverif") >= 0) return "unk";
+    if (v.indexOf("not reproduced") >= 0 || v.indexOf("understated") >= 0 || v.indexOf("too ") >= 0 || v.indexOf("not water") >= 0 || v.indexOf("actual is higher") >= 0 || v.indexOf("not monotonic") >= 0) return "bad";
+    if (v.indexOf("supported") >= 0 || v.indexOf("holds") >= 0 || v.indexOf("plausible") >= 0) return "ok";
+    return "mid";
+  }
+  function pill(text, cls) { return "<span class='pill " + cls + "'>" + text + "</span>"; }
+  var byId = {}; D.claims.forEach(function (c) { byId[c.claim_id] = c; });
+  $("pill-h1").innerHTML = pill("Partly tested: not reproduced", "unk");
+  $("pill-h2").innerHTML = pill(ratio ? "Direction right, size ~" + Math.floor(ratio / 5) * 5 + "x too big" : "tested", "bad");
+  $("pill-h3").innerHTML = pill("Mostly operating leverage", "mid");
+
+  if (hi.length) $("oil-takeaway").innerHTML = "<b>The report's collapse is not in the data.</b> Brent was above $" + R.oil_high_usd + " in " + hi.length + " quarters, and gross margin stayed between " + f1(hiMin) + "% and " + f1(hiMax) + "%, nowhere near " + R.gm_high_oil_pct + "%. But the scatter alone cannot say whether oil matters a little, so the next step is to ask a model.";
+  if (gapOil !== null) $("ablation-takeaway").innerHTML = "<b>Oil is worth keeping.</b> Adding the oil price cuts the average error by " + Math.round(gapOil) + "% compared with seasonality alone (" + f2(seasAbl.mae) + " to " + f2(oilAbl.mae) + " points). Adding weather does not help gross margin, which fits the idea that heat should act on volume, not margin.";
+  if (effect) $("effect-takeaway").innerHTML = "<b>The effect is real but small.</b> A sustained $10 rise in Brent costs about " + f2(effect) + " points of gross margin. The report implied at least " + f1(R.implied_points_per_10usd) + ". The interval (" + f2(ci[0]) + " to " + f2(ci[1]) + ") rules out anything close to the report's size.";
+  var qm = D.ebitda_by_quarter;
+  var SC = D.seasonal_costs;
+  if (qm.Q2 && SC && SC.years.length) $("seasonal-takeaway").innerHTML = "<b>Costs do not follow sales down.</b> Across " + SC.years.length + " years, net sales fell a median " + Math.abs(Math.round(SC.median_sales_change_pct)) + "% from Q2 to Q4 while operating costs fell only " + Math.abs(Math.round(SC.median_opex_change_pct)) + "%, so costs took " + Math.round(SC.median_opex_ratio_q4) + "% of Q4 sales against " + Math.round(SC.median_opex_ratio_q2) + "% of Q2 sales. That is why EBITDA margin is " + f1(qm.Q2.median) + "% in a median Q2 and " + f1(qm.Q4.median) + "% in Q4, and the report's cost story is not needed to explain it.";
+
+  /* ---------- claims table ---------- */
+  var tbody = document.querySelector("#claims-table tbody");
+  tbody.innerHTML = D.claims.map(function (c) {
+    var esc = function (s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
+    return "<tr><td>" + esc(c.claim_id) + "</td><td><b>" + esc(c.claim) + "</b><br><span class='muted'>" + esc(c.report_value) + "</span></td><td>" + esc(c.evidence) + "</td><td>" + pill(esc(c.verdict), verdictClass(c.verdict)) + "</td></tr>";
+  }).join("");
+
+  /* ---------- live status ---------- */
+  var N = D.nowcast, MON = D.monitor;
+  if (N) {
+    var iv = N.interval90 ? " (90% interval " + f1(N.interval90[0]) + " to " + f1(N.interval90[1]) + ")" : "";
+    var extra = N.extrapolating
+      ? "<p class='takeaway warn'><b>Extrapolation.</b> Brent so far this quarter is about $" + Math.round(N.brent_usd_to_date) + ", above the range the model was trained on (" + N.outside_training_range.map(function (n) { var k = +n.slice(-1); return k === 0 ? "Brent this quarter" : "Brent " + k + " quarter" + (k > 1 ? "s" : "") + " ago"; }).join(", ") + "). Treat this as a rough guide and the interval as too narrow.</p>"
+      : "<p class='muted'>Oil inputs are inside the range the model was trained on.</p>";
+    $("nowcast-card").innerHTML = "<h3>Nowcast for " + N.quarter + "</h3><p style='font-size:2rem;font-weight:800;margin:.2rem 0'>" + f1(N.predicted_gm_pct) + "%</p><p class='muted'>gross margin" + iv + ". Same quarter last year: " + (N.seasonal_naive_gm_pct ? f1(N.seasonal_naive_gm_pct) + "%" : "n/a") + ". Based on " + N.days_of_oil_data + " days of oil data" + (N.quarter_complete ? "." : " so far.") + "</p>" + extra;
+  } else $("nowcast-card").innerHTML = "<h3>Nowcast</h3><p class='muted'>Not available yet.</p>";
+  if (MON) {
+    var rows = MON.checks.map(function (c) { return "<tr><td>" + c.name.replace(/_/g, " ") + "</td><td>" + c.value + "</td><td>" + pill(c.status === "ok" ? "ok" : "warning", c.status === "ok" ? "ok" : "bad") + "</td></tr>"; }).join("");
+    $("monitor-card").innerHTML = "<h3>Drift monitor " + pill(MON.status === "ok" ? "all clear" : "needs a look", MON.status === "ok" ? "ok" : "bad") + "</h3><div class='tablewrap'><table><thead><tr><th>Check</th><th>Value</th><th></th></tr></thead><tbody>" + rows + "</tbody></table></div><p class='caption'>A warning on Brent means oil has moved into a regime the model has barely seen, so its numbers deserve more caution.</p>";
+  } else $("monitor-card").innerHTML = "<h3>Drift monitor</h3><p class='muted'>Not available yet.</p>";
+
+  /* ---------- charts ---------- */
+  function drawScatter() {
+    var xs = Q.map(function (q) { return q.brent; }), ys = Q.map(function (q) { return q.gm; });
+    var xmin = Math.floor(Math.min.apply(null, xs) / 10) * 10 - 5, xmax = Math.ceil(Math.max.apply(null, xs) / 10) * 10 + 5;
+    var c = chart("chart-scatter", { xd: [xmin, xmax], yd: [34, 68], yf: function (v) { return v + "%"; }, xf: function (v) { return "$" + v; }, xl: "Average Brent price in the quarter (USD per barrel)", yl: "Gross margin", m: { t: 36, r: 16, b: 50, l: 56 } });
+    var x = c.x, y = c.y, s = c.svg;
+    el("rect", { x: x(R.oil_high_usd), y: y(R.gm_high_oil_pct + 3), width: Math.max(0, c.m.l + c.iw - x(R.oil_high_usd)), height: y(R.gm_high_oil_pct - 3) - y(R.gm_high_oil_pct + 3), fill: "var(--orange)", opacity: .22, rx: 4 }, s);
+    el("text", { x: x(R.oil_high_usd) + 4, y: y(R.gm_high_oil_pct) - 12, "class": "orange" }, s, "report: about " + R.gm_high_oil_pct + "%");
+    el("line", { x1: c.m.l, x2: x(R.oil_low_usd), y1: y(R.gm_low_oil_pct), y2: y(R.gm_low_oil_pct), stroke: "var(--orange)", "stroke-width": 2, "stroke-dasharray": "5 4" }, s);
+    el("text", { x: c.m.l + 6, y: y(R.gm_low_oil_pct) + 16, "class": "orange" }, s, "report: above " + R.gm_low_oil_pct + "%");
+    [R.oil_low_usd, R.oil_high_usd].forEach(function (v) { el("line", { x1: x(v), x2: x(v), y1: c.m.t, y2: c.m.t + c.ih, stroke: "var(--gray)", "stroke-dasharray": "2 4", opacity: .7 }, s); });
+    Q.forEach(function (q) {
+      var cx = x(q.brent), cy = y(q.gm), hot = q.brent > R.oil_high_usd, color = hot ? "var(--orange)" : "var(--blue)";
+      var t = q.quarter + ": Brent $" + f1(q.brent) + ", gross margin " + f1(q.gm) + "%";
+      if (q.quarter.slice(-2) === "Q4") tip(el("rect", { x: cx - 4.5, y: cy - 4.5, width: 9, height: 9, transform: "rotate(45 " + cx + " " + cy + ")", fill: color, opacity: .85 }, s), t);
+      else tip(el("circle", { cx: cx, cy: cy, r: 5, fill: color, opacity: .85, stroke: "var(--card)", "stroke-width": 1 }, s), t);
+    });
+    legend(c, [{ label: "Q1 to Q3", color: "var(--blue)" }, { label: "Q4 (inventory build)", color: "var(--blue)", shape: "diamond" }, { label: "Brent above $" + R.oil_high_usd, color: "var(--orange)" }], c.m.l, 18);
+  }
+  function drawAblation() {
+    var rowsIn = [
+      { k: "Same quarter last year", v: base, cls: "g" },
+      { k: "Seasons only", v: abl.seasonal_only && abl.seasonal_only.mae, cls: "g" },
+      { k: "Seasons + weather", v: abl.seasonal_plus_weather && abl.seasonal_plus_weather.mae, cls: "g" },
+      { k: "Seasons + oil + weather", v: abl.all && abl.all.mae, cls: "g" },
+      { k: "Seasons + oil", v: abl.seasonal_plus_oil && abl.seasonal_plus_oil.mae, cls: "b" }
+    ].filter(function (r) { return typeof r.v === "number"; });
+    var barH = 34, h = rowsIn.length * (barH + 10) + 60;
+    var w0 = Math.max(280, $("chart-ablation").clientWidth || 720), narrow = w0 < 520, left = narrow ? 118 : 200;
+    var c = chart("chart-ablation", { h: function () { return h; }, xd: [0, 2.1], yd: [0, rowsIn.length], yt: [], xt: [0, .5, 1, 1.5, 2], xf: function (v) { return v.toFixed(1); }, xl: "Average one-quarter-ahead error (gross margin points), lower is better", m: { t: 8, r: 52, b: 50, l: left } });
+    rowsIn.forEach(function (r, i) {
+      var yy = 8 + i * (barH + 10), best = r.cls === "b";
+      var bar = el("rect", { x: c.m.l, y: yy, width: c.x(r.v) - c.m.l, height: barH, rx: 6, fill: best ? "var(--blue)" : "var(--gray)", opacity: best ? 1 : .55 }, c.svg);
+      tip(bar, r.k + ": " + f2(r.v));
+      var words = r.k, lines = narrow && words.length > 22 ? [words.slice(0, words.lastIndexOf(" ", 22)), words.slice(words.lastIndexOf(" ", 22) + 1)] : [words];
+      lines.forEach(function (ln, j) { el("text", { x: c.m.l - 10, y: yy + barH / 2 + 4 + (j - (lines.length - 1) / 2) * 14, "text-anchor": "end", "class": best ? "lbl strong" : "lbl" }, c.svg, ln); });
+      el("text", { x: c.x(r.v) + 8, y: yy + barH / 2 + 4, "class": best ? "lbl blue" : "lbl" }, c.svg, f2(r.v));
+    });
+  }
+  function drawEffect() {
+    if (!effect) return;
+    var maxx = Math.max(8, Math.ceil(R.implied_points_per_10usd) + 1);
+    var c = chart("chart-effect", { h: function () { return 190; }, xd: [0, maxx], yd: [0, 2], yt: [], xt: niceTicks(0, maxx, 8), xf: function (v) { return v; }, xl: "Gross margin points lost per +$10 Brent", m: { t: 8, r: 24, b: 50, l: $("chart-effect").clientWidth < 520 ? 96 : 190 } });
+    var narrow = $("chart-effect").clientWidth < 520;
+    var bars = [{ k: narrow ? "Report (minimum)" : "Report implies at least", v: R.implied_points_per_10usd, col: "var(--orange)" }, { k: narrow ? "This model" : "This model (filings + ML)", v: effect, col: "var(--blue)" }];
+    bars.forEach(function (b, i) {
+      var yy = 12 + i * 62;
+      tip(el("rect", { x: c.m.l, y: yy, width: Math.max(2, c.x(b.v) - c.m.l), height: 40, rx: 6, fill: b.col }, c.svg), b.k + ": " + f2(b.v));
+      el("text", { x: c.m.l - 10, y: yy + 25, "text-anchor": "end", "class": "lbl" }, c.svg, b.k);
+      el("text", { x: c.x(b.v) + 8 + (i === 1 ? (c.x(ci[1]) - c.x(b.v)) : 0), y: yy + 25, "class": "lbl " + (i ? "blue" : "orange") }, c.svg, f2(b.v));
+      if (i === 1) { var mid = yy + 20; el("line", { x1: c.x(ci[0]), x2: c.x(ci[1]), y1: mid, y2: mid, stroke: "var(--fg)", "stroke-width": 2 }, c.svg); [ci[0], ci[1]].forEach(function (v) { el("line", { x1: c.x(v), x2: c.x(v), y1: mid - 7, y2: mid + 7, stroke: "var(--fg)", "stroke-width": 2 }, c.svg); }); }
+    });
+  }
+  function drawBacktest() {
+    var S = B.series; if (!S.length) return;
+    var all = S.map(function (d) { return d.actual; }).concat(S.map(function (d) { return d.model; }), S.map(function (d) { return d.seasonal_naive; }));
+    var lo = Math.floor(Math.min.apply(null, all) - 1), hi2 = Math.ceil(Math.max.apply(null, all) + 1);
+    var w0 = Math.max(280, $("chart-backtest").clientWidth || 720), every = Math.max(1, Math.ceil(S.length / Math.max(3, Math.floor(w0 / 70))));
+    var xt = []; for (var i = 0; i < S.length; i += every) xt.push(i);
+    var c = chart("chart-backtest", { xd: [-.3, S.length - 1 + .3], yd: [lo, hi2], xt: xt, xf: function (v) { return S[v] ? S[v].quarter : ""; }, yf: function (v) { return v + "%"; }, yl: "Gross margin", m: { t: 34, r: 16, b: 40, l: 56 } });
+    function path(key, color, width, dash) {
+      var d = S.map(function (p, i2) { return (i2 ? "L" : "M") + c.x(i2).toFixed(1) + " " + c.y(p[key]).toFixed(1); }).join(" ");
+      el("path", { d: d, fill: "none", stroke: color, "stroke-width": width, "stroke-dasharray": dash || "", "stroke-linejoin": "round", "stroke-linecap": "round" }, c.svg);
+    }
+    path("seasonal_naive", "var(--gray)", 2, "5 4"); path("model", "var(--blue)", 2.5); path("actual", "var(--fg)", 2.5);
+    S.forEach(function (p, i2) {
+      var dot = el("circle", { cx: c.x(i2), cy: c.y(p.actual), r: 4, fill: "var(--fg)", opacity: .001 }, c.svg);
+      tip(dot, p.quarter + "\nactual " + f1(p.actual) + "%\nmodel " + f1(p.model) + "%\nseasonal baseline " + f1(p.seasonal_naive) + "%");
+      el("circle", { cx: c.x(i2), cy: c.y(p.actual), r: 2.8, fill: "var(--fg)" }, c.svg);
+    });
+    legend(c, [{ label: "Actual", color: "var(--fg)", shape: "line" }, { label: "Model (seasons + oil)", color: "var(--blue)", shape: "line" }, { label: "Same quarter last year", color: "var(--gray)", shape: "line", dash: "5 4", width: 2 }], c.m.l, 18);
+  }
+  function drawSeasonal() {
+    var labels = ["Q1", "Q2", "Q3", "Q4"], top = 32;
+    var c = chart("chart-seasonal", { h: function (w) { return Math.max(260, Math.round(w * 0.5)); }, xd: [0, 4], yd: [0, top], xt: [.5, 1.5, 2.5, 3.5], xf: function (v) { return labels[Math.floor(v)]; }, yf: function (v) { return v + "%"; }, yl: "EBITDA margin", m: { t: 36, r: 16, b: 40, l: 56 } });
+    var bw = Math.min(46, (c.x(1) - c.x(0)) * 0.34);
+    labels.forEach(function (q, i) {
+      var cx = c.x(i + .5), rep = R.ebitda_by_quarter[q], act = qm[q]; if (!act) return;
+      var rx = cx - bw - 3, ax = cx + 3;
+      tip(el("rect", { x: rx, y: c.y(rep), width: bw, height: c.y(0) - c.y(rep), rx: 4, fill: "var(--orange)", opacity: .9 }, c.svg), "Report, " + q + ": " + f1(rep) + "%");
+      el("text", { x: rx + bw / 2, y: c.y(rep) - 6, "text-anchor": "middle", "class": "lbl orange" }, c.svg, f1(rep));
+      tip(el("rect", { x: ax, y: c.y(act.median), width: bw, height: c.y(0) - c.y(act.median), rx: 4, fill: "var(--blue)" }, c.svg), "Actual median, " + q + ": " + f1(act.median) + "% (range " + f1(act.min) + " to " + f1(act.max) + "%, " + act.n + " years)");
+      var mx = ax + bw / 2; el("line", { x1: mx, x2: mx, y1: c.y(act.min), y2: c.y(act.max), stroke: "var(--fg)", "stroke-width": 2 }, c.svg);
+      [act.min, act.max].forEach(function (v) { el("line", { x1: mx - 5, x2: mx + 5, y1: c.y(v), y2: c.y(v), stroke: "var(--fg)", "stroke-width": 2 }, c.svg); });
+      el("text", { x: mx, y: c.y(act.max) - 6, "text-anchor": "middle", "class": "lbl blue" }, c.svg, f1(act.median));
+    });
+    legend(c, [{ label: "What the report said", color: "var(--orange)" }, { label: "Actual median (whisker: best and worst year)", color: "var(--blue)" }], c.m.l, 18);
+  }
+  function drawCosts() {
+    var Y = (D.seasonal_costs && D.seasonal_costs.years) || []; if (!Y.length) return;
+    var vals = []; Y.forEach(function (d) { vals.push(d.sales_change_pct, d.opex_change_pct); });
+    var lo = Math.floor(Math.min.apply(null, vals) / 10) * 10 - 10, hi = Math.ceil(Math.max.apply(null, vals) / 10) * 10 + 10;
+    var c = chart("chart-costs", { h: function (w) { return Math.max(270, Math.round(w * 0.5)); }, xd: [0, Y.length], yd: [lo, hi], xt: Y.map(function (d, i) { return i + .5; }), xf: function (v) { return Y[Math.floor(v)].year; }, yf: function (v) { return v > 0 ? "+" + v + "%" : v + "%"; }, yl: "Change from Q2 to Q4", m: { t: 36, r: 16, b: 40, l: 60 } });
+    el("line", { x1: c.m.l, x2: c.m.l + c.iw, y1: c.y(0), y2: c.y(0), stroke: "var(--fg)", "stroke-width": 1.5 }, c.svg);
+    var bw = Math.min(30, (c.x(1) - c.x(0)) * 0.38);
+    Y.forEach(function (d, i) {
+      var cx = c.x(i + .5);
+      [[d.sales_change_pct, cx - bw - 2, "var(--gray)", "Net sales"], [d.opex_change_pct, cx + 2, "var(--blue)", "Operating costs"]].forEach(function (b) {
+        var top = c.y(Math.max(b[0], 0)), bottom = c.y(Math.min(b[0], 0));
+        tip(el("rect", { x: b[1], y: top, width: bw, height: Math.max(1, bottom - top), rx: 3, fill: b[2], opacity: b[3] === "Net sales" ? .65 : 1 }, c.svg), d.year + ", " + b[3] + ": " + (b[0] > 0 ? "+" : "") + f1(b[0]) + "% (Q2 to Q4)");
+        if (c.iw / Y.length > 52) el("text", { x: b[1] + bw / 2, y: b[0] < 0 ? bottom + 13 : top - 5, "text-anchor": "middle", "class": "lbl" }, c.svg, Math.round(b[0]));
+      });
+    });
+    legend(c, [{ label: "Net sales", color: "var(--gray)" }, { label: "Operating costs", color: "var(--blue)" }], c.m.l, 18);
+  }
+  function drawAll() { drawScatter(); drawAblation(); drawEffect(); drawBacktest(); drawSeasonal(); drawCosts(); }
+  drawAll();
+  var lastW = window.innerWidth, timer;
+  window.addEventListener("resize", function () { clearTimeout(timer); timer = setTimeout(function () { if (window.innerWidth !== lastW) { lastW = window.innerWidth; drawAll(); } }, 150); });
+})();
+</script>
+</body>
+</html>

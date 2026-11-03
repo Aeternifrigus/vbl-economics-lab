@@ -35,6 +35,7 @@ from .monitor import run_monitor
 from .nowcast import run_nowcast
 from .release import build_release, latest_model_files, verify_release
 from .settings import settings
+from .site import build_site_data, write_data_js
 from .snapshot import save_snapshot
 from .validate import check_vbl, load_vbl, vbl_warnings
 
@@ -46,6 +47,8 @@ app = typer.Typer(
 
 REPO_ROOT = DATA_RAW.parents[1]
 VBL_CSV = DATA_RAW / "vbl_quarterly.csv"
+CLAIMS_CSV = REPO_ROOT / "claims" / "claims.csv"
+SITE_DATA_JS = REPO_ROOT / "docs" / "data.js"
 MANUAL_CSV = DATA_RAW / "manual_statements.csv"
 FEATURES_CSV = DATA_EXT / "features_quarterly.csv"
 TARGET = "gm_pct"
@@ -444,6 +447,40 @@ def release(
     if problems:
         _fail("Release failed its own verification: " + "; ".join(problems))
     typer.echo(f"Wrote {archive} and {archive}.sha256")
+
+
+@app.command()
+def site(
+    out: Path = typer.Option(SITE_DATA_JS, "--out", help="Where to write the website's data file"),
+) -> None:
+    """Write docs/data.js, the data behind the project website, from the repository's outputs."""
+    setup_logging()
+
+    def _json(path: Path) -> dict | None:
+        return json.loads(path.read_text()) if path.exists() else None
+
+    try:
+        features_df = pd.read_csv(FEATURES_CSV)
+        backtest_summary = _json(REPORTS / "backtest.json")
+        model_files = sorted(MODELS.glob("lagged_gm_*.json"))
+        leverage_files = sorted(MODELS.glob("leverage_*.json"))
+        if not FEATURES_CSV.exists() or backtest_summary is None:
+            raise FileNotFoundError("run `pwl features` and `pwl backtest` first")
+        if not model_files or not leverage_files:
+            raise FileNotFoundError("run `pwl train` and `pwl leverage` first")
+        data = build_site_data(
+            features_df,
+            pd.read_csv(CLAIMS_CSV),
+            backtest_summary,
+            json.loads(model_files[-1].read_text()),
+            json.loads(leverage_files[-1].read_text()),
+            _json(REPORTS / "nowcast.json"),
+            _json(REPORTS / "monitor.json"),
+        )
+    except FileNotFoundError as exc:
+        _fail(str(exc), EXIT_MISSING)
+    write_data_js(data, out)
+    typer.echo(f"Wrote {out} ({len(data['quarters'])} quarters, {len(data['claims'])} claims)")
 
 
 @app.command()

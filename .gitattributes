@@ -1,0 +1,6 @@
+# Keep line endings stable across platforms so patches and diffs apply cleanly.
+* text=auto eol=lf
+*.csv text eol=lf
+*.lock text eol=lf
+*.png binary
+*.joblib binary

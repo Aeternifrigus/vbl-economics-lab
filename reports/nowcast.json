@@ -1,0 +1,19 @@
+{
+  "quarter": "2026Q4",
+  "predicted_gm_pct": 54.87,
+  "interval90": [
+    51.69,
+    57.14
+  ],
+  "extrapolating": true,
+  "outside_training_range": [
+    "brent_inr_lag0",
+    "brent_inr_lag2"
+  ],
+  "brent_usd_to_date": 124.83,
+  "days_of_oil_data": 19,
+  "quarter_complete": false,
+  "seasonal_naive_gm_pct": 55.38,
+  "model_latest_quarter": "2026Q3",
+  "generated_at": "2026-11-03T00:11:58+00:00"
+}

@@ -40,7 +40,7 @@ def get_json(
                 retries,
                 extra={"extra_fields": {"url_host": urllib.parse.urlparse(url).netloc}},
             )
-            req = urllib.request.Request(url, headers={"User-Agent": "packaged-water-lab/0.1"})
+            req = urllib.request.Request(url, headers={"User-Agent": "vbl-economics-lab/0.1"})
             with urllib.request.urlopen(req, timeout=timeout, context=SSL_CONTEXT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 logger.debug(

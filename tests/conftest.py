@@ -5,6 +5,7 @@ from typer.testing import CliRunner
 
 from pwl import cli, snapshot
 from pwl.config import DATA_RAW
+from pwl.models import lagged
 
 
 @pytest.fixture
@@ -27,6 +28,7 @@ def sandbox(tmp_path, monkeypatch):
         monkeypatch.setattr(cli, name, value)
     monkeypatch.setattr(snapshot, "DATA_EXT", ext)
     monkeypatch.setattr(cli.settings, "bootstrap_samples", 40)  # keep integration tests fast
+    monkeypatch.setattr(lagged, "ALPHAS", (0.1, 10.0, 1000.0))
     ext.mkdir()
     return paths
 

@@ -14,11 +14,15 @@ from ..logging_config import get_logger
 logger = get_logger(__name__)
 
 
+# Ridge penalties searched by time-series cross-validation. Tests shrink this for speed.
+ALPHAS: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0)
+
+
 def fit_lagged_ridge(
     df: pd.DataFrame,
     target: str,
     features: list[str],
-    alphas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0),
+    alphas: tuple[float, ...] | None = None,
     force: bool = False,
 ) -> Pipeline:
     """Fit a distributed-lag ridge regression with time-series cross-validation."""
@@ -51,7 +55,7 @@ def fit_lagged_ridge(
     pipe = Pipeline([("scale", StandardScaler()), ("ridge", Ridge())])
     search = GridSearchCV(
         pipe,
-        {"ridge__alpha": list(alphas)},
+        {"ridge__alpha": list(alphas or ALPHAS)},
         cv=TimeSeriesSplit(n_splits=n_splits),
         scoring="neg_mean_absolute_error",
     )

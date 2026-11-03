@@ -1,4 +1,4 @@
-"""Custom exceptions for the packaged-water-lab package."""
+"""Custom exceptions for the vbl-economics-lab package."""
 
 
 class PWLError(Exception):
@@ -53,3 +53,11 @@ class ConfigurationError(PWLError):
     def __init__(self, message: str, missing: list[str] | None = None):
         super().__init__(message, {"missing": missing or []})
         self.missing = missing or []
+
+
+class ReleaseError(PWLError):
+    """Raised when a model release cannot be built or fails verification."""
+
+    def __init__(self, message: str, problems: list[str] | None = None):
+        super().__init__(message, {"problems": problems or []})
+        self.problems = problems or []

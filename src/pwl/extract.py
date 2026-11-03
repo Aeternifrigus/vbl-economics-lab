@@ -348,7 +348,7 @@ def ocr_page(page: object) -> str:
     except ImportError as exc:
         raise ConfigurationError(
             "OCR needs pytesseract and the tesseract binary. "
-            "Run: pip install 'packaged-water-lab[ocr]'",
+            "Run: pip install 'vbl-economics-lab[ocr]'",
             missing=["pytesseract"],
         ) from exc
     image = page.to_image(resolution=400).original.convert("L")  # type: ignore[attr-defined]
@@ -371,7 +371,7 @@ def read_pdf_pages(path: Path, ocr: bool = False, max_ocr_pages: int = MAX_OCR_P
         import pdfplumber  # noqa: PLC0415  (optional dependency, imported on use)
     except ImportError as exc:
         raise ConfigurationError(
-            "pdfplumber is not installed. Run: pip install 'packaged-water-lab[pdf]'",
+            "pdfplumber is not installed. Run: pip install 'vbl-economics-lab[pdf]'",
             missing=["pdfplumber"],
         ) from exc
     texts: list[str] = []

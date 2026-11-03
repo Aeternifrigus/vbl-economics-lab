@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -26,7 +26,7 @@ def save_snapshot(df: pd.DataFrame, name: str, source: str) -> Path:
         "sha256": digest,
         "rows": int(len(df)),
         "source": source,
-        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
 

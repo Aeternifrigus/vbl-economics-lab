@@ -31,11 +31,11 @@ def quarterly_weather(daily: pd.DataFrame) -> pd.DataFrame:
         n_days=("date", "count"),
     )
 
-    expected = _expected_days(g.index)
+    expected = _expected_days(pd.PeriodIndex(g.index))
     complete = g["n_days"].to_numpy() >= expected
     g = g[complete].drop(columns="n_days")
 
-    qnum = g.index.quarter
+    qnum = pd.PeriodIndex(g.index).quarter
     for col, name in [("tmax_mean", "tmax_anom"), ("rain_mm", "rain_anom")]:
         clim = g.groupby(qnum)[col].transform(lambda s: s.shift().expanding().mean())
         g[name] = g[col] - clim
@@ -58,7 +58,7 @@ def quarterly_oil_fx(brent_daily: pd.DataFrame, fx_daily: pd.DataFrame) -> pd.Da
     m["usdinr"] = m["usdinr"].ffill()
     m = m.dropna()
     m["brent_inr"] = m["brent_usd"] * m["usdinr"]
-    result = m.groupby(m.index.to_period("Q")).mean()
+    result = m.groupby(pd.DatetimeIndex(m.index).to_period("Q")).mean()
 
     logger.info("Quarterly oil/FX: %d quarters", len(result))
     return result
@@ -95,7 +95,7 @@ def build_table(
     t["opm_pct"] = (t["gross_profit_cr"] - t["opex_cr"]) / t["net_revenue_cr"] * 100
 
     for quarter in (2, 3, 4):
-        t[f"q{quarter}"] = (t.index.quarter == quarter).astype(float)
+        t[f"q{quarter}"] = (pd.PeriodIndex(t.index).quarter == quarter).astype(float)
 
     # Oil is lagged on the full quarterly index so lags reach before the first company quarter.
     oil_l = add_lags(oil_q, ["brent_inr"], n_lags)

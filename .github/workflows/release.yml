@@ -1,0 +1,39 @@
+name: release
+
+# Push a tag like v2026Q3 to publish a verified model bundle as a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements.lock
+      - run: pip install --require-hashes -r requirements.lock
+      - run: pip install --no-deps -e .
+      - name: Build the model, evaluation and nowcast from the committed data
+        run: |
+          python -m pwl validate
+          python -m pwl leverage
+          python -m pwl train
+          python -m pwl backtest
+          python -m pwl nowcast || echo "no nowcast for the current quarter yet"
+      - name: Bundle and verify the release
+        run: python -m pwl release --tag "${GITHUB_REF_NAME}" --out dist
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/*.tar.gz dist/*.sha256 \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Model bundle with data hashes and evaluation. Verify with the .sha256 file and RELEASE_MANIFEST.json."

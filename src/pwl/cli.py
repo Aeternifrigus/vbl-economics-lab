@@ -1,4 +1,4 @@
-"""Command-line interface for packaged-water-lab.
+"""Command-line interface for vbl-economics-lab.
 
 Exit codes: 0 success, 1 error or validation failure, 2 missing input file,
 3 not enough data for the requested model.
@@ -6,7 +6,7 @@ Exit codes: 0 success, 1 error or validation failure, 2 missing input file,
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import NoReturn
 
@@ -14,6 +14,7 @@ import joblib
 import pandas as pd
 import typer
 
+from . import __version__
 from .backtest import rolling_backtest
 from .config import ABLATIONS, DATA_EXT, DATA_RAW, LAG_FEATURES, MODELS, REPORTS
 from .exceptions import (
@@ -22,6 +23,7 @@ from .exceptions import (
     InsufficientDataError,
     ModelTrainingError,
     PWLError,
+    ReleaseError,
 )
 from .extract import extract_directory, merge_into_table
 from .features import build_table, quarterly_oil_fx, quarterly_weather
@@ -29,16 +31,20 @@ from .ingest import fred, openmeteo
 from .logging_config import setup_logging
 from .models.lagged import coef_table, cumulative_effect_interval, fit_lagged_ridge
 from .models.leverage import fit_leverage, render_report, variance_decomposition
+from .monitor import run_monitor
+from .nowcast import run_nowcast
+from .release import build_release, latest_model_files, verify_release
 from .settings import settings
 from .snapshot import save_snapshot
 from .validate import check_vbl, load_vbl, vbl_warnings
 
 app = typer.Typer(
     name="pwl",
-    help="Packaged Water Lab: testing the packaged-water economics narrative against data",
+    help="VBL Economics Lab: packaged-water economics narrative vs VBL filings, oil, FX, weather",
     add_completion=False,
 )
 
+REPO_ROOT = DATA_RAW.parents[1]
 VBL_CSV = DATA_RAW / "vbl_quarterly.csv"
 MANUAL_CSV = DATA_RAW / "manual_statements.csv"
 FEATURES_CSV = DATA_EXT / "features_quarterly.csv"
@@ -47,6 +53,7 @@ TARGET = "gm_pct"
 EXIT_ERROR = 1
 EXIT_MISSING = 2
 EXIT_INSUFFICIENT = 3
+EXIT_DRIFT = 4
 
 
 def _fail(message: str, code: int = EXIT_ERROR) -> NoReturn:
@@ -55,7 +62,7 @@ def _fail(message: str, code: int = EXIT_ERROR) -> NoReturn:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _read_snapshot(name: str) -> pd.DataFrame:
@@ -136,6 +143,20 @@ def _build_features() -> pd.DataFrame:
     return table
 
 
+def _backtest_error_quantiles(df: pd.DataFrame) -> dict[str, float] | None:
+    """5th, 50th and 95th percentile of (actual - predicted) over the rolling backtest.
+
+    Used to put an empirical 90% interval around nowcasts. None when there are too few quarters.
+    """
+    try:
+        result, _ = rolling_backtest(df, TARGET, LAG_FEATURES, min_train=12)
+    except InsufficientDataError:
+        return None
+    errors = (result["actual"] - result["model"]).to_numpy(dtype=float)
+    q05, q50, q95 = (float(v) for v in pd.Series(errors).quantile([0.05, 0.5, 0.95]))
+    return {"q05": q05, "q50": q50, "q95": q95, "n": float(len(errors))}
+
+
 def _train(df: pd.DataFrame, force: bool) -> None:
     model = fit_lagged_ridge(df, TARGET, LAG_FEATURES, force=force)
     MODELS.mkdir(parents=True, exist_ok=True)
@@ -148,6 +169,10 @@ def _train(df: pd.DataFrame, force: bool) -> None:
     oil_rows = table[table["feature"].isin(oil_features)]
     alpha = float(model.named_steps["ridge"].alpha)
     effect = float(oil_rows["coef_raw"].sum())
+    error_quantiles = _backtest_error_quantiles(df)
+    continuous = [f for f in LAG_FEATURES if f.startswith("brent_inr_lag")]
+    used = df[continuous].dropna()
+    ranges = {f: [float(used[f].min()), float(used[f].max())] for f in continuous}
     low, high = cumulative_effect_interval(
         df, TARGET, LAG_FEATURES, oil_features, alpha, n_boot=settings.bootstrap_samples
     )
@@ -162,6 +187,8 @@ def _train(df: pd.DataFrame, force: bool) -> None:
         "data_sha256": hashlib.sha256(FEATURES_CSV.read_bytes()).hexdigest(),
         "trained_at": _now(),
         "coefficients": table.to_dict(orient="records"),
+        "backtest_error_quantiles": error_quantiles,
+        "training_feature_ranges": ranges,
         "cumulative_brent_inr_effect": effect,
         "cumulative_brent_inr_effect_ci90": [low, high],
         "gm_points_per_10usd_brent": None
@@ -186,6 +213,21 @@ def _backtest(df: pd.DataFrame, min_train: int) -> None:
     REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / "backtest.json").write_text(json.dumps(summary, indent=2))
     typer.echo(json.dumps(summary, indent=2))
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"vbl-economics-lab {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _root(
+    version: bool = typer.Option(
+        False, "--version", callback=_version_callback, is_eager=True, help="Show the version"
+    ),
+) -> None:
+    """VBL Economics Lab."""
 
 
 @app.command()
@@ -261,7 +303,7 @@ def ingest(
     key = settings.fred_api_key
     if not key:
         _fail("FRED_API_KEY not set. Get a free key from fred.stlouisfed.org and export it.")
-    end = datetime.now(timezone.utc).date().isoformat()
+    end = datetime.now(UTC).date().isoformat()
     typer.echo(f"Ingesting data from {start} to {end}...")
     try:
         brent = fred.fetch_series(fred.BRENT, key, start)
@@ -314,6 +356,94 @@ def backtest(
         _fail(f"Cannot backtest: {exc.message}", EXIT_INSUFFICIENT)
     except FileNotFoundError as exc:
         _fail(str(exc), EXIT_MISSING)
+
+
+@app.command()
+def nowcast(
+    quarter: str = typer.Option(
+        "", "--quarter", help="Quarter to nowcast, e.g. 2026Q4 (default: now)"
+    ),
+) -> None:
+    """Estimate a quarter's gross margin from oil to date and the trained model."""
+    setup_logging()
+    try:
+        model_path, meta_path = latest_model_files(MODELS)
+        model = joblib.load(model_path)
+        meta = json.loads(meta_path.read_text())
+        target = pd.Period(quarter or datetime.now(UTC).date(), freq="Q")
+        features_df = _load_features()
+        result = run_nowcast(
+            model,
+            meta,
+            _read_snapshot("brent_daily"),
+            _read_snapshot("usdinr_daily"),
+            target,
+            actual_gm=features_df[TARGET],
+        )
+    except ReleaseError as exc:
+        _fail(exc.message, EXIT_MISSING)
+    except FileNotFoundError as exc:
+        _fail(str(exc), EXIT_MISSING)
+    except InsufficientDataError as exc:
+        _fail(f"Cannot nowcast: {exc.message}", EXIT_INSUFFICIENT)
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    (REPORTS / "nowcast.json").write_text(json.dumps(result.to_dict(), indent=2))
+    typer.echo(json.dumps(result.to_dict(), indent=2))
+
+
+@app.command()
+def monitor(
+    strict: bool = typer.Option(False, "--strict", help="Exit 4 when any check warns"),
+) -> None:
+    """Check for input drift (Brent regime) and performance drift (recent model errors)."""
+    setup_logging()
+    try:
+        features_df = _load_features()
+        brent = _read_snapshot("brent_daily")
+        backtest_df, _ = rolling_backtest(features_df, TARGET, LAG_FEATURES, min_train=12)
+    except FileNotFoundError as exc:
+        _fail(str(exc), EXIT_MISSING)
+    except InsufficientDataError as exc:
+        _fail(f"Cannot monitor: {exc.message}", EXIT_INSUFFICIENT)
+    report = run_monitor(brent, backtest_df)
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    (REPORTS / "monitor.json").write_text(json.dumps(report, indent=2))
+    typer.echo(f"status: {report['status']}")
+    for check in report["checks"]:
+        typer.echo(
+            f"  [{check['status']:>4}] {check['name']} = {check['value']} "
+            f"(limit {check['threshold']})"
+        )
+    if strict and report["status"] != "ok":
+        raise typer.Exit(EXIT_DRIFT)
+
+
+@app.command()
+def release(
+    tag: str = typer.Option(..., "--tag", help="Release label, e.g. v2026Q3"),
+    out: Path = typer.Option(Path("dist"), "--out", help="Where to write the release"),
+) -> None:
+    """Bundle the trained model, its data, evaluation and model card with verified hashes."""
+    setup_logging()
+    try:
+        archive = build_release(
+            tag,
+            MODELS,
+            FEATURES_CSV,
+            VBL_CSV,
+            REPORTS,
+            [REPO_ROOT / "MODEL_CARD.md", REPO_ROOT / "LICENSE"],
+            out,
+            REPO_ROOT,
+        )
+    except FileNotFoundError as exc:
+        _fail(str(exc), EXIT_MISSING)
+    except ReleaseError as exc:
+        _fail(f"Cannot release: {exc.message}")
+    problems = verify_release(archive.with_name(archive.name.removesuffix(".tar.gz")))
+    if problems:
+        _fail("Release failed its own verification: " + "; ".join(problems))
+    typer.echo(f"Wrote {archive} and {archive}.sha256")
 
 
 @app.command()

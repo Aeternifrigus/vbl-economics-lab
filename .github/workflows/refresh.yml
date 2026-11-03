@@ -1,8 +1,9 @@
 name: refresh-data
 
+# Monthly: pull oil, FX and weather, retrain, nowcast the current quarter, check for drift, commit.
 on:
   schedule:
-    - cron: "0 5 1 * *"   # monthly, 05:00 UTC on the 1st
+    - cron: "0 5 1 * *"   # 05:00 UTC on the 1st of each month
   workflow_dispatch:
 
 permissions:
@@ -15,23 +16,46 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
-      - run: pip install -e .
+          cache-dependency-path: requirements.lock
+      - run: pip install --require-hashes -r requirements.lock
+      - run: pip install --no-deps -e .
       - name: Pull oil, FX and weather snapshots
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python -m pwl ingest
-      - name: Rebuild the quarterly feature table
-        run: python -m pwl features
-      - name: Commit snapshots
+      - name: Validate data and rebuild the quarterly feature table
+        run: |
+          python -m pwl validate
+          python -m pwl features
+      - name: Retrain (refuses below 20 quarters, never forced)
+        run: python -m pwl train
+      - name: Nowcast the current quarter
+        # Fails harmlessly in the first days of a quarter, before any oil data exists for it.
+        continue-on-error: true
+        run: python -m pwl nowcast
+      - name: Check for input and performance drift
+        run: |
+          python -m pwl monitor | tee monitor.txt
+          {
+            echo "### Model monitor"
+            echo '```'
+            cat monitor.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if grep -q "status: warn" monitor.txt; then
+            echo "::warning title=Model monitor::drift check raised a warning, see the job summary"
+          fi
+      - name: Commit snapshots, metadata and reports
         run: |
           git config user.name "Aeternifrigus"
           git config user.email "aeternifrigus@proton.me"
-          git add data/external
-          git diff --cached --quiet || git commit -m "Refresh data snapshots"
+          git add data/external reports models/*.json
+          git diff --cached --quiet || git commit -m "Refresh data, nowcast and monitor report"
           git push

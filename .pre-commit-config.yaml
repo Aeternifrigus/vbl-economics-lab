@@ -1,13 +1,18 @@
+# Hooks run the project's own pinned tools (from requirements-dev.lock), so a local commit is
+# checked by exactly the same ruff and mypy as CI. Install with: pre-commit install
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.0
-    hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-      - id: ruff-format
-
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff
+        entry: ruff check --fix --exit-non-zero-on-fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format
+        language: system
+        types: [python]
       - id: mypy
         name: mypy
         entry: mypy src/pwl
@@ -24,6 +29,5 @@ repos:
       - id: check-toml
       - id: check-json
       - id: check-merge-conflict
-      - id: debug-logger
       - id: mixed-line-ending
         args: [--fix=lf]

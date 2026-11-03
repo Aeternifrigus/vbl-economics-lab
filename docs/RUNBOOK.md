@@ -52,6 +52,17 @@ a linear model and the interval understates the uncertainty. This is the case at
 Brent in the first days of 2026Q4 is far above the training range. Nowcasting a quarter that is already
 in the training data (for example 2026Q3) is in-sample and flatters the model.
 
+## Website
+
+`docs/index.html` is a self-contained page (no libraries, no CDN) that tells the story and draws every chart
+from `docs/data.js`. `pwl site` regenerates that file from the repository's own outputs, and the monthly
+workflow does it automatically, so the page cannot drift from the results.
+
+- Publish: Settings, Pages, "Deploy from a branch", branch `main`, folder `/docs`. The site appears at
+  `https://aeternifrigus.github.io/vbl-economics-lab/`.
+- Preview locally: open `docs/index.html` in a browser. It works straight from disk.
+- Change the story or wording by editing `docs/index.html`. Change a number by fixing its source, never the page.
+
 ## Releases and rollback
 
 A release is `vbl-economics-lab-<tag>.tar.gz` plus a `.sha256` file. Inside, `RELEASE_MANIFEST.json`

@@ -40,6 +40,10 @@ jobs:
         # Fails harmlessly in the first days of a quarter, before any oil data exists for it.
         continue-on-error: true
         run: python -m pwl nowcast
+      - name: Backtest and rebuild the website data
+        run: |
+          python -m pwl backtest
+          python -m pwl site
       - name: Check for input and performance drift
         run: |
           python -m pwl monitor | tee monitor.txt
@@ -56,6 +60,6 @@ jobs:
         run: |
           git config user.name "Aeternifrigus"
           git config user.email "aeternifrigus@proton.me"
-          git add data/external reports models/*.json
-          git diff --cached --quiet || git commit -m "Refresh data, nowcast and monitor report"
+          git add data/external reports models/*.json docs/data.js
+          git diff --cached --quiet || git commit -m "Refresh data, nowcast, monitor report and website data"
           git push

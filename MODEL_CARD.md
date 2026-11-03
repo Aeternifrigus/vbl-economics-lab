@@ -21,5 +21,5 @@ Project: vbl-economics-lab. Both models describe VBL, a soft-drink-led bottler, 
 - Purpose: describe how much of the quarterly EBITDA margin swing comes from fixed cost spread over volume.
 - Model: opex = fixed + variable x net revenue, ordinary least squares with t-based 90% intervals and leave-one-out error.
 - Data: the same 38 quarters.
-- Result: R squared 0.93, fixed cost about 205 crore a quarter (130 to 281), variable cost about 26% of net revenue (24% to 28%), leave-one-out error about 6.5 points of EBITDA margin.
+- Result: R squared 0.93, fixed cost about 205 crore a quarter (130 to 281), variable cost about 26% of net revenue (24% to 28%), leave-one-out error about 6.5 points of EBITDA margin. Caveat: this pooled line mixes ten years of growth with the seasons, so it understates how sticky costs are within a year. Compared within each year, Q2 to Q4 net sales fall by a median 51% and operating costs by only 15%.
 - Main risks: revenue grew about 15-fold over the period, so one linear cost line is a rough description. Consolidated multi-product numbers. A gap at 2017Q1 and 2017Q2.

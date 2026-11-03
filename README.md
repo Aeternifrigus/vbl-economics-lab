@@ -1,5 +1,7 @@
 # vbl-economics-lab
 
+**Live site:** [aeternifrigus.github.io/vbl-economics-lab](https://aeternifrigus.github.io/vbl-economics-lab/) (the story, the hypotheses, and the charts). By [Aeternifrigus](https://aeternifrigus.netlify.app).
+
 Testing the "economic engine of Indian packaged water" narrative against Varun Beverages (VBL) filings, oil, FX and weather data, and operating the result as a small, reproducible ML system.
 
 The project started from three industry reports with strong claims (a 42% Q2 volume surge, r = 0.89 between heat and volume, a 38% gross margin floor when Brent is above 90 dollars). Those claims are treated as hypotheses. `claims/claims.csv` records each one, the evidence found, and a verdict. VBL is a soft-drink-led bottler, so the findings describe VBL, not the packaged water category.
@@ -20,7 +22,7 @@ The project started from three industry reports with strong claims (a 42% Q2 vol
 
 Oil cuts error by 12% beyond seasonality. Weather makes gross margin forecasts worse, which fits the theory that weather should act on volume, not gross margin. The feature set was chosen by looking at this same backtest, so treat the 19% as slightly optimistic.
 
-**The seasonal margin swing is mostly operating leverage.** Median EBITDA margin is 27.7% in Q2, 21.4% in Q3, 18.8% in Q1 and 12.5% in Q4 (the report had 21.8%, 13.5%, 14.2% and 16.0%). Fixed cost is about 205 crore a quarter (90% interval 130 to 281) and variable cost about 26% of net revenue (24% to 28%).
+**The seasonal margin swing is mostly operating leverage.** Median EBITDA margin is 27.7% in Q2, 21.4% in Q3, 18.8% in Q1 and 12.5% in Q4 (the report had 21.8%, 13.5%, 14.2% and 16.0%). The cleanest evidence is within each year: from Q2 to Q4, net sales fall by a median 51% but operating costs by only 15%, so costs go from about 26% of sales to about 43%. (A single pooled cost line gives about 205 crore fixed plus 26% of sales, but it mixes ten years of growth with the seasons and understates how sticky costs are within a year.)
 
 ## How the system works
 
@@ -50,6 +52,7 @@ Oil cuts error by 12% beyond seasonality. Weather makes gross margin forecasts w
 | `pwl leverage` | Fit the operating leverage model and report |
 | `pwl nowcast` | Running estimate of the current quarter's gross margin, with a 90% interval and an extrapolation flag |
 | `pwl monitor` | Input drift (Brent regime) and performance drift checks, writes `reports/monitor.json` |
+| `pwl site` | Write `docs/data.js`, the data behind the project website, from the repository's own outputs |
 | `pwl release --tag vX` | Bundle model, data, evaluation and model card with a verified hash manifest |
 | `pwl refit` | validate, leverage, features, train, backtest in one go. Never forces training |
 
@@ -58,7 +61,7 @@ Exit codes: 0 success, 1 error or failed validation, 2 missing input, 3 not enou
 ## Production practices
 
 - **Reproducible installs.** `requirements.lock` and `requirements-dev.lock` are hash-pinned. CI, the Docker image and both scheduled workflows install with `--require-hashes`. The results in this README reproduce to the digit across two library versions I tested.
-- **CI on every push.** ruff, ruff format, mypy and the full test suite (90 tests, 91% coverage, gate 75%). Tests include an end-to-end pipeline on synthetic data with a planted signal, so a misaligned join or leaky feature fails the build.
+- **CI on every push.** ruff, ruff format, mypy and the full test suite (100 tests, gate 75%). Tests include an end-to-end pipeline on synthetic data with a planted signal, so a misaligned join or leaky feature fails the build.
 - **Data you can trust.** Every parsed column must tie out to the filing's own totals, and a test pins the table to the margins the company itself reported. The earlier extraction that read the wrong line items is quarantined in `data/quarantine/`.
 - **Automated refresh.** A monthly workflow pulls oil, FX and weather, validates, retrains, nowcasts, runs the drift checks, prints them in the job summary and commits the snapshots and reports.
 - **Honest outputs.** Nowcasts carry an empirical interval and flag when oil is outside the training range. The monitor warns when Brent is in a regime the model has not seen (it is, as of 2026-11-03).
